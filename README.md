@@ -1,11 +1,12 @@
-1. Neurocat
+## Neurocat
 
 Neurocat is an experimental toy library studying 2 things:
-- the concepts described in this amazing paper [Backprop as Functor: A compositional
+- **The link between category theory and supervisable learning algorithm and neural networks** through the concepts described in this amazing paper [Backprop as Functor: A compositional
 perspective on supervised learning](https://arxiv.org/pdf/1711.10455.pdf?utm_content=bufferf2efc&utm_medium=social&utm_source=twitter.com&utm_campaign=buffer) which tries to unify (partly at least) category theory & supervised learning concepts & simple neural networks/
 
-- how to represent matrices (and thus neural networks) which dimensions are checked at compile-time using the new feature singleton-types described in [SIP-23](http://docs.scala-lang.org/sips/pending/42.type.html) which allows to manipulate the integer `3` as the value `3` but also the type `3`. My matrix experimentations has been used in the little & really cool library [singleton-ops](https://github.com/fthomas/singleton-ops) by [Frank S. Thomas](https://github.com/fthomas) the author of the great `refined` library too.
+- **How to represent matrices (and thus neural networks) which dimensions are checked at compile-time using the new feature singleton-types** described in [SIP-23](http://docs.scala-lang.org/sips/pending/42.type.html) which allows to manipulate the integer `3` as the value `3` but also the type `3`. `Shapeless Nat` is a nice idea but not good for big values because this is a recursive structure (down to 0) checked at compile-time so `100000` isn't imaginable with it. My matrix experimentations use the little & really cool library [singleton-ops](https://github.com/fthomas/singleton-ops) by [Frank S. Thomas](https://github.com/fthomas) the author of the great `refined` library too. 
 
+- **how to represent matrices (and thus neural networks) which dimensions are checked at compile-time using the new feature singleton-types** described in [SIP-23](http://docs.scala-lang.org/sips/pending/42.type.html) which allows to manipulate the integer `3` as the value `3` but also the type `3`. My matrix experimentations use the little & really cool library [singleton-ops](https://github.com/fthomas/singleton-ops) by [Frank S. Thomas](https://github.com/fthomas) the author of the great `refined` library too. Shapeless `Nat` is a nice idea but not good for big naturals because this is a recursive structure (down to 0) checked at compile-time so `100000` as 
 
 Very superficially, the idea of the paper is quite simple (minus a few details): 
 - A supervised learning algorithm can be seen as a structure able to approximate a function `A -> B` relying on parameters P which are updated through an optimization/training process using a set of training samples.
@@ -34,9 +35,9 @@ I'm just scratching the surface of all of those concepts. I'm not a NeuralNetwor
 
 So first, have a look at this sample:
 
-- Basic Compile-time Matrix calculus: ...
-- Matrix Compile-time Huge Matrix calculus: ...
-- Neural network layers transformed into Learn instances and then composed and trained: ...
+- Basic Compile-time Matrix calculus: https://github.com/mandubian/neurocat/blob/master/src/test/scala/MatTest.scala#L15-L47
+- Neural network layers transformed into Learn instances and then composed and trained: https://github.com/mandubian/neurocat/blob/master/src/test/scala/NNetTest.scala#L40-L129
+- Neural network + Huge Matrices that compiles in human time: https://github.com/mandubian/neurocat/blob/master/src/test/scala/NNetTest.scala#L131-L163
 
 > For info, to manipulate matrices, I used [ND4J](http://nd4j.org/) to have an array abstraction to test both in CPU or GPU mode but any library doing this could be used naturally.
 
