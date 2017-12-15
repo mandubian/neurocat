@@ -9,6 +9,7 @@ import org.nd4j.linalg.factory.NDArrayFactory
 
 import cats.Show
 import spire.algebra.{Module, Rng}
+import shapeless.ops.hlist.IsHCons
 
 /**
   * A compile-time sized array relying on ND4J INDArray
@@ -23,15 +24,34 @@ object Mat {
     value.reshape(hrc.rs.value, hrc.cs.value)
   )
 
-  def columnVector[R, Rows <: XInt](array: Array[R])(
-    implicit num: Numeric[R], rRows: Require[Rows > 0], opRows: SafeInt[Rows]
-  ): Mat[R, Rows x 1] = {
-    require(array.length == opRows.value, s"Array is ${array.length} long but should be ${opRows.value} long")
+
+  /** build a column vector from an array with (R > 0) rows
+    * If array hasn't exactly R elements, it will crash at runtime
+    */
+  def columnVector[S, Rows <: XInt](array: Array[S])(
+    implicit
+      num: Numeric[S], opRows: SafeRows[Rows]
+  ): Mat[S, Rows x 1] = {
+    require(array.length == opRows.value, s"For ColumnVector, Array is ${array.length} long but should be ${opRows.value} long")
     val size = Array(opRows.value, 1)
-    new Mat[R, Rows x 1](
+    new Mat[S, Rows x 1](
       Nd4j.create(array.map(x => num.toDouble(x)), size)
     )
-  } 
+  }
+
+  /** build a row vector from an array with (R > 0) rows
+    * If array hasn't exactly R elements, it will crash at runtime
+    */
+  def rowVector[S, Cols <: XInt](array: Array[S])(
+    implicit
+      num: Numeric[S], opCols: SafeCols[Cols]
+  ): Mat[S, 1 x Cols] = {
+    require(array.length == opCols.value, s"For RowVector, Array is ${array.length} long but should be ${opCols.value} long")
+    val size = Array(1, opCols.value)
+    new Mat[S, 1 x Cols](
+      Nd4j.create(array.map(x => num.toDouble(x)), size)
+    )
+  }
 
   def fromArrays[R, D <: Dim2[_, _]](arrays: Array[Array[R]])(
     implicit num: Numeric[R], rcs: RowsCols[D]
@@ -55,7 +75,7 @@ object Mat {
       s"""Mat${st.showType}(${a.value})"""
   }
 
-  implicit def matrixCalculs[S](implicit n: Numeric[S]): MatrixCalculus[Mat, S] = new MatrixCalculus[Mat, S] {
+  implicit def matrixCalculus[S](implicit n: Numeric[S]): MatrixCalculus[Mat, S] = new MatrixCalculus[Mat, S] {
     def mult[D1 <: Dim, D2 <: Dim](a1: Mat[S, D1], a2: Mat[S, D2])(implicit mult: DimMult[D1, D2]): Mat[S, mult.R] = {
       new Mat[S, mult.R](a1.value.mmul(a2.value))
     }
@@ -98,15 +118,15 @@ object Mat {
     implicit def scalar = sRng
   }
 
-  implicit def rowTraversable[S, R <: XInt, C <: XInt](
-    implicit rowsNb: SafeInt[R]
-  ) = new RowTraversable[Mat[S, R x C], Mat[S, C x 1]] {
-    def foreachRow[U](t: Mat[S, R x C]) (f: Mat[S, C x 1] => U): Unit = {
-      (0 to rowsNb.value).foreach { i =>
-        f(new Mat[S, C x 1](t.value.getRow(i).transposei()))
-      }
-    }
-  }
+  // implicit def rowTraversable[S, R <: XInt, C <: XInt](
+  //   implicit rowsNb: SafeInt[R]
+  // ) = new RowTraversable[Mat[S, R x C], Mat[S, C x 1]] {
+  //   def foreachRow[U](t: Mat[S, R x C]) (f: Mat[S, C x 1] => U): Unit = {
+  //     (0 to rowsNb.value).foreach { i =>
+  //       f(new Mat[S, C x 1](t.value.getRow(i).transposei()))
+  //     }
+  //   }
+  // }
 
   // hard coded for Mat for now
   def train[P, S, InRows <: XInt, OutRows <: XInt, NbSamples <: XInt](
@@ -136,3 +156,64 @@ object Mat {
   }  
 }
 
+sealed abstract class DataSet[Row, NbSamples <: XInt](
+  implicit nbSamples: SafeInt[NbSamples]
+) {
+  private[nd4j] def getRow(i: Int): Row
+
+  def foreachRow[U](f: Row => U): Unit = {
+    (0 until nbSamples).foreach { i =>
+      f(getRow(i))
+    }
+  }
+
+  def zip[Row2](other: DataSet[Row2, NbSamples]): DataSet[(Row, Row2), NbSamples] = {
+    ProductDataSet(this, other)
+  }
+} 
+
+case class ProductDataSet[Row1, Row2, NbSamples <: XInt] private(
+  d1: DataSet[Row1, NbSamples], d2: DataSet[Row2, NbSamples]
+)(
+  implicit nbSamples: SafeInt[NbSamples]
+) extends DataSet[(Row1, Row2), NbSamples] {
+
+  private[nd4j] def getRow(i: Int): (Row1, Row2) = {
+    (d1.getRow(i), d2.getRow(i))
+  }
+
+} 
+
+case class SingleDataSet[S, D <: Dim, NbSamples <: XInt : SafeInt] private(data: INDArray) extends DataSet[Mat[S, D], NbSamples] {
+
+  private[nd4j] def getRow(i: Int): Mat[S, D] = {
+    new Mat[S, D](data.getRow(i))
+  }
+
+  def getRow[I <: XInt](
+    implicit i: Require[I < NbSamples] ==> SafeInt[I]
+  ): Mat[S, D] = {
+    getRow(i)
+  }
+
+}
+
+object DataSet {
+  implicit val rowTraversable: RowTraversable[DataSet] = new RowTraversable[DataSet] {
+    def foreachRow[Row, NbSamples <: XInt, U](a: DataSet[Row, NbSamples])(f: Row => U): Unit =
+      a.foreachRow(f)
+  }
+
+  trait DataSetBuilder[NbSamples <: XInt] {
+    def apply[S, Cols <: XInt, NbSamples <: XInt : SafeInt](
+      data: Mat[S, NbSamples x Cols]
+    ): DataSet[Mat[S, Cols x 1], NbSamples]
+  }
+
+  def apply[NbSamples <: XInt] = new DataSetBuilder[NbSamples] {
+    def apply[S, Cols <: XInt, NbSamples <: XInt : SafeInt](
+      data: Mat[S, NbSamples x Cols]
+    ): DataSet[Mat[S, Cols x 1], NbSamples] =
+      SingleDataSet[S, Cols x 1, NbSamples](data.value)
+  }
+}

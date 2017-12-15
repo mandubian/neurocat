@@ -146,6 +146,33 @@ object Learn {
     }
   }
 
+
+  object Naive {
+
+    def trainer[
+      M[s, d <: Dim]
+    , DataSet[row, nb <: XInt]
+    , S, Params, In <: Dim, Out <: Dim
+    ](implicit rowTr: RowTraversable[DataSet]): Trainer[DataSet, S, Params, In, Out] =
+      new Trainer[DataSet, S, Params, In, Out] {      
+        def train[NbSamples <: XInt](
+          learn: Learn.Aux[Params, In, Out]
+        )(
+          initParams: Params
+        , trainingData: DataSet[(In, Out), NbSamples]
+        ): Params = {
+          var params = initParams
+
+          rowTr.foreachRow(trainingData) {
+            case (inRow, outRow) =>
+              params = learn.update(params)(inRow, outRow)
+          }
+
+          params
+        }
+      }
+
+  }
 }
 
 object Neurocat {
