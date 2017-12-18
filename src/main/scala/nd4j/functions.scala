@@ -4,7 +4,7 @@ package nd4j
 import singleton.ops._
 import org.nd4j.linalg.factory.Nd4j
 
-object Output {
+object Body {
   def Dense[R, InR <: XInt, OutR <: XInt, OutC <: XInt] =
     new ParametrisedDifferentiable[
       Mat[R, OutR x InR]

@@ -20,18 +20,18 @@ object NNetTest extends SimpleTestSuite {
     println(weights.show)
 
     val netLayer = NNetLayerBuilder[Mat, Double, 3 x 1, 1 x 1].build(
-      output     = Output.Dense
+      body       = Body.Dense
     , activation = Activation.Sigmoid
     )
 
     val x = Mat.columnVector[Double, 3](Array(0.0, 1.0, 0.0))
-    val y = netLayer.activation(netLayer.output(weights)(x))
+    val y = netLayer.activation(netLayer.body(weights)(x))
 
     println(s"x:${x.show} y:${y.show}")
 
     val parafn = NNetLayer2ParaFn(netLayer)
 
-    val y2 = parafn(weights)(x)
+    val y2 = parafn(weights :: HNil)(x)
 
     println(s"x:${x.show} y2:${y2.show}")
 
@@ -44,34 +44,34 @@ object NNetTest extends SimpleTestSuite {
     //                            (Matrix constrained by size)
     //                            |    (Scala type in the matrix)
     //                            |    |         (Input neurons size)
-    //                            |    |         |      (Output neurons size)
+    //                            |    |         |      (body neurons size)
     //                            |    |         |      |
     //                            ˅    ˅         ˅      ˅
     val layer1 = NNetLayerBuilder[Mat, Double, 2 x 1, 2 x 1].build(
-      output     = Output.Dense
+      body     = Body.Dense
     , activation = Activation.Sigmoid
     )
 
     // 2nd layer
     val layer2 = NNetLayerBuilder[Mat, Double, 2 x 1, 1 x 1].build(
-      output     = Output.Dense
+      body     = Body.Dense
     , activation = Activation.Sigmoid
     )
 
     // convert layer 1 into parametrised function then into learner 
-    val parafn1 = NNetLayer2ParaFn2(layer1)
-    val learn1 = ParaFn2Learn3(parafn1)(0.1, Loss.L2)
+    val parafn1 = NNetLayer2ParaFn(layer1)
+    val learn1 = ParaFn2Learn(parafn1)(0.1, Loss.L2)
 
     // convert layer 2 into parametrised function then into learner 
-    val parafn2 = NNetLayer2ParaFn2(layer2)
-    val learn2 = ParaFn2Learn3(parafn2)(0.1, Loss.L2)
+    val parafn2 = NNetLayer2ParaFn(layer2)
+    val learn2 = ParaFn2Learn(parafn2)(0.1, Loss.L2)
 
     // compose both learners into one single learner
     val learn = learn1.andThen(learn2)
     /* Please remark that type of learn is:
      *                         Params type is the tuple of both layers params
      *                              |                      (Input neurons size from layer1)
-     *                              |                      |                   (Output neurons size from layer2)
+     *                              |                      |                   (body neurons size from layer2)
      *                              |                      |                   |
      *                              ˅                      ˅                   ˅
      * Learn.Aux[(Mat[Double, 2 x 2], Mat[Double, 1 x 2]), Mat[Double, 2 x 1], Mat[Double, 1 x 1]]
@@ -89,7 +89,7 @@ object NNetTest extends SimpleTestSuite {
     , Array(1, 1)
     ))
 
-    // Output Training Samples
+    // body Training Samples
     val trainY = Mat.fromArrays[Double, 4 x 1](Array(
       Array(0)
     , Array(1)
@@ -132,23 +132,23 @@ object NNetTest extends SimpleTestSuite {
 
   test("Very big neuron layers that compiles fast") {
     val layer1 = NNetLayerBuilder[Mat, Double, 20000 x 1, 30000 x 1].build(
-      output     = Output.Dense
+      body     = Body.Dense
     , activation = Activation.Sigmoid
     )
 
     // 2nd layer
     val layer2 = NNetLayerBuilder[Mat, Double, 30000 x 1, 100000 x 1].build(
-      output     = Output.Dense
+      body     = Body.Dense
     , activation = Activation.Sigmoid
     )
 
     // convert layer 1 into parametrised function then into learner 
-    val parafn1 = NNetLayer2ParaFn2(layer1)
-    val learn1 = ParaFn2Learn3(parafn1)(0.1, Loss.L2)
+    val parafn1 = NNetLayer2ParaFn(layer1)
+    val learn1 = ParaFn2Learn(parafn1)(0.1, Loss.L2)
 
     // convert layer 2 into parametrised function then into learner 
-    val parafn2 = NNetLayer2ParaFn2(layer2)
-    val learn2 = ParaFn2Learn3(parafn2)(0.1, Loss.L2)
+    val parafn2 = NNetLayer2ParaFn(layer2)
+    val learn2 = ParaFn2Learn(parafn2)(0.1, Loss.L2)
 
     // compose both learners into one single learner
     val learn = learn1.andThen(learn2)
@@ -168,34 +168,34 @@ object NNetTest extends SimpleTestSuite {
     //                            (Matrix constrained by size)
     //                            |    (Scala type in the matrix)
     //                            |    |         (Input neurons size)
-    //                            |    |         |      (Output neurons size)
+    //                            |    |         |      (body neurons size)
     //                            |    |         |      |
     //                            ˅    ˅         ˅      ˅
     val layer1 = NNetLayerBuilder[Mat, Double, 2 x 1, 2 x 1].build(
-      output     = Output.Dense
+      body     = Body.Dense
     , activation = Activation.Sigmoid
     )
 
     // 2nd layer
     val layer2 = NNetLayerBuilder[Mat, Double, 2 x 1, 1 x 1].build(
-      output     = Output.Dense
+      body     = Body.Dense
     , activation = Activation.Sigmoid
     )
 
     // convert layer 1 into parametrised function then into learner 
-    val parafn1 = NNetLayer2ParaFn2(layer1)
-    val learn1 = ParaFn2Learn3(parafn1)(0.1, Loss.L2)
+    val parafn1 = NNetLayer2ParaFn(layer1)
+    val learn1 = ParaFn2Learn(parafn1)(0.1, Loss.L2)
 
     // convert layer 2 into parametrised function then into learner 
-    val parafn2 = NNetLayer2ParaFn2(layer2)
-    val learn2 = ParaFn2Learn3(parafn2)(0.1, Loss.L2)
+    val parafn2 = NNetLayer2ParaFn(layer2)
+    val learn2 = ParaFn2Learn(parafn2)(0.1, Loss.L2)
 
     // compose both learners into one single learner
     val learn = learn1.andThen(learn2)
     /* Please remark that type of learn is:
      *                         Params type is the tuple of both layers params
      *                              |                      (Input neurons size from layer1)
-     *                              |                      |                   (Output neurons size from layer2)
+     *                              |                      |                   (body neurons size from layer2)
      *                              |                      |                   |
      *                              ˅                      ˅                   ˅
      * Learn.Aux[(Mat[Double, 2 x 2], Mat[Double, 1 x 2]), Mat[Double, 2 x 1], Mat[Double, 1 x 1]]
@@ -213,7 +213,7 @@ object NNetTest extends SimpleTestSuite {
     , Array(1, 1)
     )))
 
-    // Output Training Samples
+    // body Training Samples
     val trainY = DataSet[4](Mat.fromArrays[Double, 4 x 1](Array(
       Array(0)
     , Array(1)
@@ -258,7 +258,7 @@ object NNetTest extends SimpleTestSuite {
     , Array(1, 1)
     )))
 
-    // Output Training Samples
+    // body Training Samples
     val trainY = DataSet[4](Mat.fromArrays[Double, 4 x 1](Array(
       Array(0)
     , Array(1)
@@ -274,21 +274,24 @@ object NNetTest extends SimpleTestSuite {
 
     // Build Neural Network from Heterogenous list of type-aligned network layers
     // 1st layer
-    val layer1 = NNetLayerBuilder0[Mat, Double, 2 x 1, 2 x 1].build(
-      output     = Output.Dense
+    val layer1 = NNetLayerBuilder[Mat, Double, 2 x 1, 2 x 1].build(
+      body     = Body.Dense
     , activation = Activation.Sigmoid
     )
 
     // 2nd layer
-    val layer2 = NNetLayerBuilder0[Mat, Double, 2 x 1, 1 x 1].build(
-      output     = Output.Dense
+    val layer2 = NNetLayerBuilder[Mat, Double, 2 x 1, 1 x 1].build(
+      body     = Body.Dense
     , activation = Activation.Sigmoid
     )
 
-    val net = layer1 :: layer2 :: NNil0()
+    val net = layer1 :: layer2 :: NNil()
 
+    // Converts neural network description into a Supervised Learning Algorithm
+    // using a learning parameter & L2 loss function
     val learner = net.toLearn(0.1, Loss.L2)
 
+    // Train learner using very naive trainer & above training DataSets (sizes checked at compile-time)
     val trainedParams = Learn.Trainer.naive[DataSet].train(learner)(
       weights1 :: weights2 :: HNil
     , trainX.zip(trainY)
