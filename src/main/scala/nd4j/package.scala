@@ -6,6 +6,13 @@ import org.nd4j.linalg.api.ndarray.INDArray
 import org.nd4j.linalg.factory.NDArrayFactory
 import scala.collection.breakOut
 
+import cats.Show
+import shapeless.{HNil, ::}
+import spire.algebra.{Module, Rng}
+
+import singleton.ops._
+
+
 package object nd4j {
 
   sealed trait NDOrdering {
@@ -23,6 +30,34 @@ package object nd4j {
       case 'f' => Fortran
       case _ => throw new IllegalArgumentException("NDimensional Ordering accepts only 'c' or 'f'.")
     }
+  }
+
+
+  implicit def moduleHNil[S, R <: XInt, C <: XInt](
+    implicit
+      n: Numeric[S]
+    , sRng: Rng[S]
+    , opRows: SafeInt[R], opCols: SafeInt[C]
+  ): Module[Mat[S, R x C] :: HNil, S] = new Module[Mat[S, R x C] :: HNil, S] {
+    def negate(a: Mat[S, R x C] :: HNil): Mat[S, R x C] :: HNil =
+      new Mat[S, R x C](a.head.value.negi()) :: HNil
+
+    def zero: Mat[S, R x C] :: HNil =
+      new Mat[S, R x C](Nd4j.zeros(Array(opRows.value, opCols.value), Nd4j.order())) :: HNil
+
+    def plus(x: Mat[S, R x C] :: HNil, y: Mat[S, R x C] :: HNil): Mat[S, R x C] :: HNil =
+      new Mat[S, R x C](x.head.value.add(y.head.value)) :: HNil
+
+    def timesl(r: S, v: Mat[S, R x C] :: HNil): Mat[S, R x C] :: HNil =
+      new Mat[S, R x C](v.head.value.muli(n.toDouble(r))) :: HNil
+
+    implicit def scalar = sRng
+  }
+
+
+  implicit def show[R, D <: Dim](implicit st: ShowType[D]) = new Show[Mat[R, D] :: HNil] {
+    def show(a: Mat[R, D] :: HNil): String =
+      s"""Mat${st.showType}(${a.head.value})"""
   }
 
   /** copied from ND4S... not useful for now */

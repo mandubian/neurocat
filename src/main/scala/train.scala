@@ -2,13 +2,14 @@ package neurocat
 
 import singleton.ops._
 import cats.Cartesian
+import shapeless.HList
 
 
 trait Trainer[
-  DataSet[row, nb <: XInt], S, Params, In <: Dim, Out <: Dim
+  DataSet[row, nb <: XInt]
 ] {
-  def train[NbSamples <: XInt](
-    learner: Learn.Aux[Params, In, Out]
+  def train[Params <: HList, In, Out, NbSamples <: XInt](
+    learner: HLearn[Params, In, Out]
   )(
     initParams: Params
   , trainingData: DataSet[(In, Out), NbSamples]

@@ -70,3 +70,11 @@ trait ParametrisedDifferentiable[P, A, B] extends ParametrisedFunction[A, B] {
 /** a euclidean differentiable parametrised function */
 trait EuclideanParametrisedFunction[Arr[a, d <: Dim], R, P <: Dim, N <: Dim, M <: Dim]
   extends ParametrisedDifferentiable[Arr[R, P], Arr[R, N], Arr[R, M]]
+
+trait MatrixFunction[Arr[a, d <: Dim], S] {
+  def apply[D <: Dim]: Differentiable[Arr[S, D], Arr[S, D]]
+}
+
+trait MatrixFunction2[Arr[a, d <: Dim], S] {
+  def apply[D <: Dim]: PartialDifferentiableInvertible2[Arr[S, D], 1]
+}

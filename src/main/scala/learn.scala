@@ -4,7 +4,8 @@ import cats.arrow.Category
 import cats.Functor
 import cats.Show
 
-import shapeless.{HList, HNil, ::}
+import shapeless.{HList, HNil, ::, Nat}
+import shapeless.ops.hlist.{Prepend, Take, Drop, Length}
 import spire.implicits._
 import spire.math._
 import spire.algebra._
@@ -42,23 +43,37 @@ trait Learn[A, B] {
     */
   def request(params: Params)(a: A, b: B): A
 
-  /** classic category composition refined with Param type */
-  def andThen[Q, C](other: Learn.Aux[Q, B, C]): Learn.Aux[(self.Params, Q), A, C] = new Learn[A, C] {
-    type Params = (self.Params, Q)
+}
 
-    def implement(params: (self.Params, Q))(a: A) = {
-      other.implement(params._2)(self.implement(params._1)(a))
+trait HLearn[P <: HList, A, B] extends Learn[A, B] {
+  self =>
+
+
+  type Params = P
+
+  /** classic category composition refined with Param type */
+  def andThen[Q <: HList, C, All <: HList, PL <: Nat](other: HLearn[Q, B, C])(
+    implicit
+      prepend : Prepend.Aux[P, Q, All]
+    , pLength : Length.Aux[P, PL]
+    , take: Take.Aux[All, PL, P]
+    , drop: Drop.Aux[All, PL, Q]
+  ): HLearn[All, A, C] = new HLearn[All, A, C] {
+
+    def implement(params: Params)(a: A) = {
+      other.implement(drop(params))(self.implement(take(params))(a))
     }
 
-    def update(params: (self.Params, Q))(a: A, c: C) = {
-      val b = self.implement(params._1)(a)
-      ( self.update(params._1)(a, other.request(params._2)(b, c))
-      , other.update(params._2)(b, c)
+    def update(params: Params)(a: A, c: C) = {
+      val b = self.implement(take(params))(a)
+      prepend(
+        self.update(take(params))(a, other.request(drop(params))(b, c))
+      , other.update(drop(params))(b, c)
       )
     }
 
-    def request(params: (self.Params, Q))(a: A, c: C) = {
-      self.request(params._1)(a, other.request(params._2)(self.implement(params._1)(a), c))
+    def request(params: Params)(a: A, c: C) = {
+      self.request(take(params))(a, other.request(drop(params))(self.implement(take(params))(a), c))
     }
   }
 }
@@ -69,11 +84,11 @@ object Learn {
 
   /* the Identiy in the supervised learning algorithm category */
   def Id[A] = new Learn[A, A] {
-    type Params = Unit
+    type Params = HNil
 
     def implement(params:Params)(a:A) = a
 
-    def update(params:Params)(a1:A, a2:A) = ()
+    def update(params:Params)(a1:A, a2:A) = HNil
 
     def request(params:Params)(a1:A, a2:A) = a2
   }
@@ -147,16 +162,14 @@ object Learn {
   }
 
 
-  object Naive {
+  object Trainer {
 
-    def trainer[
-      M[s, d <: Dim]
-    , DataSet[row, nb <: XInt]
-    , S, Params, In <: Dim, Out <: Dim
-    ](implicit rowTr: RowTraversable[DataSet]): Trainer[DataSet, S, Params, In, Out] =
-      new Trainer[DataSet, S, Params, In, Out] {      
-        def train[NbSamples <: XInt](
-          learn: Learn.Aux[Params, In, Out]
+    def naive[
+      DataSet[row, nb <: XInt]
+    ](implicit rowTr: RowTraversable[DataSet]): Trainer[DataSet] =
+      new Trainer[DataSet] {      
+        def train[Params <: HList, In, Out, NbSamples <: XInt](
+          learn: HLearn[Params, In, Out]
         )(
           initParams: Params
         , trainingData: DataSet[(In, Out), NbSamples]
@@ -175,7 +188,7 @@ object Learn {
   }
 }
 
-object Neurocat {
+trait NeurocatFunctors {
 
   def ParaFn2Learn[M[a, d <: Dim], S, P, In <: Dim, Out <: Dim](
     f: ParametrisedDifferentiable[P, M[S, In], M[S, Out]]
@@ -190,8 +203,8 @@ object Neurocat {
     , mNorm: DimNorm[Out, S]
     , rMultGroup: MultiplicativeGroup[S]
     // not useful... just to display things in debug mode
-    , showP: Show[P]
-    , showA: Show[M[S, In]]
+    // , showP: Show[P]
+    // , showA: Show[M[S, In]]
   ): Learn.Aux[P, M[S, In], M[S, Out]] = new Learn[M[S, In], M[S, Out]] {
       type Params   = P
 
@@ -221,6 +234,91 @@ object Neurocat {
       }
   }
 
+  def ParaFn2Learn2[M[a, d <: Dim], S, P, In <: Dim, Out <: Dim](
+    f: ParametrisedDifferentiable[P, M[S, In], M[S, Out]]
+  )(
+    eps: S
+  , cost: MatrixFunction2[M, S]
+  )(
+    implicit
+      mat: MatrixCalculus[M, S]
+    , pmod: Module[P, S]
+    , mNorm: DimNorm[Out, S]
+    , rMultGroup: MultiplicativeGroup[S]
+    // not useful... just to display things in debug mode
+    // , showP: Show[P]
+    // , showA: Show[M[S, In]]
+  ): Learn.Aux[P, M[S, In], M[S, Out]] = new Learn[M[S, In], M[S, Out]] {
+      type Params   = P
+
+      def implement(params: P)(a: M[S, In]) = {
+        f(params)(a)
+      }
+
+      def update(params: P)(a: M[S, In], b: M[S, Out]) = {
+        //UI(p, a, b) ≔ p − ε∇pEI(p, a, b)
+        val estim: M[S, Out] = f(params)(a)
+        val err: M[S, Out] = cost[Out].diff(estim)(b)
+        val diffPerP: P = f.diffPerP(params)(a)(err)
+        // val paramsUpd = mat.times(mat.mult(diffPerP, err), rMultGroup.times(eps, mNorm.norm))
+        val paramsUpd: P = pmod.timesr(diffPerP, rMultGroup.times(eps, mNorm.norm))
+        // println(s"mult:${rMultGroup.times(eps, mNorm.norm)} paramsUpd:${showP.show(paramsUpd)}")
+        pmod.minus(params, paramsUpd)
+      }
+
+      def request(params: P)(a: M[S, In], b: M[S, Out]) = {
+        // rI(p, a, b) ≔ fa((1/α(m))*∇aEI(p, a, b))
+        val estim: M[S, Out] = f(params)(a)
+        val err: M[S, Out] = cost[Out].diff(estim)(b)
+        val diffPerA: M[S, In] = f.diffPerA(params)(a)(err)
+        val aUpdate = mat.times(diffPerA, rMultGroup.reciprocal(mNorm.norm))
+        // println(s"aUpdate:${showA.show(aUpdate)}")
+        cost[In].diffInvert(a)(aUpdate)
+      }
+  }
+
+  def ParaFn2Learn3[M[a, d <: Dim], S, P <: HList, In <: Dim, Out <: Dim](
+    f: ParametrisedDifferentiable[P, M[S, In], M[S, Out]]
+  )(
+    eps: S
+  , cost: MatrixFunction2[M, S]
+  )(
+    implicit
+      mat: MatrixCalculus[M, S]
+    , pmod: Module[P, S]
+    , mNorm: DimNorm[Out, S]
+    , rMultGroup: MultiplicativeGroup[S]
+    // not useful... just to display things in debug mode
+    // , showP: Show[P]
+    // , showA: Show[M[S, In]]
+  ): HLearn[P, M[S, In], M[S, Out]] = new HLearn[P, M[S, In], M[S, Out]] {
+
+      def implement(params: P)(a: M[S, In]) = {
+        f(params)(a)
+      }
+
+      def update(params: P)(a: M[S, In], b: M[S, Out]) = {
+        //UI(p, a, b) ≔ p − ε∇pEI(p, a, b)
+        val estim: M[S, Out] = f(params)(a)
+        val err: M[S, Out] = cost[Out].diff(estim)(b)
+        val diffPerP: P = f.diffPerP(params)(a)(err)
+        // val paramsUpd = mat.times(mat.mult(diffPerP, err), rMultGroup.times(eps, mNorm.norm))
+        val paramsUpd: P = pmod.timesr(diffPerP, rMultGroup.times(eps, mNorm.norm))
+        // println(s"mult:${rMultGroup.times(eps, mNorm.norm)} paramsUpd:${showP.show(paramsUpd)}")
+        pmod.minus(params, paramsUpd)
+      }
+
+      def request(params: P)(a: M[S, In], b: M[S, Out]) = {
+        // rI(p, a, b) ≔ fa((1/α(m))*∇aEI(p, a, b))
+        val estim: M[S, Out] = f(params)(a)
+        val err: M[S, Out] = cost[Out].diff(estim)(b)
+        val diffPerA: M[S, In] = f.diffPerA(params)(a)(err)
+        val aUpdate = mat.times(diffPerA, rMultGroup.reciprocal(mNorm.norm))
+        // println(s"aUpdate:${showA.show(aUpdate)}")
+        cost[In].diffInvert(a)(aUpdate)
+      }
+  }
+
   def NNetLayer2ParaFn[M[a, d <: Dim], S, InR <: XInt, OutR <: XInt, OutC <: XInt](
     layer: NNetLayer[M, S, InR, OutR, OutC]
   )(implicit
@@ -245,6 +343,239 @@ object Neurocat {
     }
 
 
+  def NNetLayer2ParaFn2[M[a, d <: Dim], S, InR <: XInt, OutR <: XInt, OutC <: XInt](
+    layer: NNetLayer[M, S, InR, OutR, OutC]
+  )(implicit
+    mat: MatrixCalculus[M, S]
+  ): ParametrisedDifferentiable[M[S, OutR x InR] :: HNil, M[S, InR x OutC], M[S, OutR x OutC]] =
+    new ParametrisedDifferentiable[M[S, OutR x InR] :: HNil, M[S, InR x OutC], M[S, OutR x OutC]] {
+      def apply(params: M[S, OutR x InR] :: HNil)(a: M[S, InR x OutC]): M[S, OutR x OutC] = {
+        layer.activation(layer.output(params.head)(a))
+      }
+
+      def diffPerP(params: M[S, OutR x InR] :: HNil)(a: M[S, InR x OutC])(e: M[S, OutR x OutC]): M[S, OutR x InR] :: HNil = {
+        val s: M[S, OutR x OutC] = layer.activation.diff(layer.output(params.head)(a))
+        val t: M[S, OutR x InR] = layer.output.diffPerP(params.head)(a)(mat.hadamard(e, s))
+        t :: HNil
+      }
+
+      def diffPerA(params: M[S, OutR x InR] :: HNil)(a: M[S, InR x OutC])(e: M[S, OutR x OutC]): M[S, InR x OutC] = {
+        val s: M[S, OutR x OutC] = layer.activation.diff(layer.output(params.head)(a))
+        layer.output.diffPerA(params.head)(a)(mat.hadamard(e, s))
+      }
+
+    }
+
+  def NNetLayer2ParaFn3[M[a, d <: Dim], S, W <: Dim2[_, _], In <: Dim2[_, _], Out <: Dim2[_, _]](
+    layer: NNetLayer0[M, S, W, In, Out]
+  )(implicit
+    mat: MatrixCalculus[M, S]
+  ): ParametrisedDifferentiable[M[S, W] :: HNil, M[S, In], M[S, Out]] =
+    new ParametrisedDifferentiable[M[S, W] :: HNil, M[S, In], M[S, Out]] {
+      def apply(params: M[S, W] :: HNil)(a: M[S, In]): M[S, Out] = {
+        layer.activation(layer.output(params.head)(a))
+      }
+
+      def diffPerP(params: M[S, W] :: HNil)(a: M[S, In])(e: M[S, Out]): M[S, W] :: HNil = {
+        val s: M[S, Out] = layer.activation.diff(layer.output(params.head)(a))
+        val t: M[S, W] = layer.output.diffPerP(params.head)(a)(mat.hadamard(e, s))
+        t :: HNil
+      }
+
+      def diffPerA(params: M[S, W] :: HNil)(a: M[S, In])(e: M[S, Out]): M[S, In] = {
+        val s: M[S, Out] = layer.activation.diff(layer.output(params.head)(a))
+        layer.output.diffPerA(params.head)(a)(mat.hadamard(e, s))
+      }
+
+    }
+
+  trait Layers2HLearn[
+    M[a, d <: Dim], S, InR <: XInt, OutR <: XInt, OutC <: XInt
+  , CS <: HList
+  , L <: Layers[M, S, InR, OutR, OutC, CS]
+  ] {
+
+    def convert2Learn(ls: L)(
+      eps: S
+    , cost: MatrixFunction2[M, S]
+    ): HLearn[CS, M[S, InR x OutC], M[S, OutR x OutC]]
+
+  }
+
+  object Layers2HLearn {
+    implicit def one[M[a, d <: Dim], S, InR <: XInt, OutR <: XInt, OutC <: XInt](implicit
+      mat: MatrixCalculus[M, S]
+    , pmod: Module[M[S, OutR x InR] :: HNil, S]
+    , mNorm: DimNorm[OutR x OutC, S]
+    , rMultGroup: MultiplicativeGroup[S]
+    // // not useful... just to display things in debug mode
+    // , showP: Show[M[S, OutR x InR] :: HNil]
+    // , showA: Show[M[S, InR x OutC]]
+    ) = new Layers2HLearn[
+        M, S, InR, OutR, OutC
+      , M[S, OutR x InR] :: HNil
+      , ConsLayer[M, S, InR, OutR, OutR, OutC, HNil, NNil[M, S, OutR, OutC]]
+    ] {
+      def convert2Learn(
+        ls: ConsLayer[M, S, InR, OutR, OutR, OutC, HNil, NNil[M, S, OutR, OutC]]
+      )(
+        eps: S
+      , cost: MatrixFunction2[M, S]
+      ): HLearn[M[S, OutR x InR] :: HNil, M[S, InR x OutC], M[S, OutR x OutC]] = {
+        ParaFn2Learn3(NNetLayer2ParaFn2(ls.h))(eps, cost)
+      }
+
+    }
+
+    implicit def cons[
+      M[a, d <: Dim], S, InR <: XInt, H <: XInt, OutR <: XInt, OutC <: XInt
+    , CS <: HList
+    , L <: Layers[M, S, H, OutR, OutC, CS]
+    ](implicit
+      mat: MatrixCalculus[M, S]
+    , pmod: Module[M[S, H x InR] :: HNil, S]
+    , mNorm: DimNorm[H x OutC, S]
+    , rMultGroup: MultiplicativeGroup[S]
+    , next: Layers2HLearn[M, S, H, OutR, OutC, CS, L]
+    , prepend : Prepend.Aux[M[S, H x InR] :: HNil, CS, M[S, H x InR] :: CS]
+    , take: Take.Aux[M[S, H x InR] :: CS, Nat._1, M[S, H x InR] :: HNil]
+    , drop: Drop.Aux[M[S, H x InR] :: CS, Nat._1, CS]
+    ) = new Layers2HLearn[
+        M, S, InR, OutR, OutC
+      , M[S, H x InR] :: CS
+      , ConsLayer[M, S, InR, H, OutR, OutC, CS, L]
+    ] {
+      def convert2Learn(
+        ls: ConsLayer[M, S, InR, H, OutR, OutC, CS, L]
+      )(
+        eps: S
+      , cost: MatrixFunction2[M, S]
+      ): HLearn[M[S, H x InR] :: CS, M[S, InR x OutC], M[S, OutR x OutC]] = {
+        ParaFn2Learn3(NNetLayer2ParaFn2(ls.h))(eps, cost).andThen(
+          next.convert2Learn(ls.t)(eps, cost)
+        )
+      }
+
+    }
+
+
+  }
+
+
+  trait Layers2HLearn0[
+    M[a, d <: Dim], S, In <: Dim2[_, _], Out <: Dim2[_, _]
+  , WS <: HList, L <: Layers0[M, S, WS, In, Out]
+  ] {
+
+    def convert2Learn(ls: L)(
+      eps: S
+    , cost: MatrixFunction2[M, S]
+    ): HLearn[WS, M[S, In], M[S, Out]]
+
+  }
+
+  object Layers2HLearn0 {
+    implicit def one[M[a, d <: Dim], S, W <: Dim2[_, _], In <: Dim2[_, _], Out <: Dim2[_, _]](implicit
+      mat: MatrixCalculus[M, S]
+    , pmod: Module[M[S, W] :: HNil, S]
+    , mNorm: DimNorm[Out, S]
+    , rMultGroup: MultiplicativeGroup[S]
+    ) = new Layers2HLearn0[
+        M, S, In, Out
+      , M[S, W] :: HNil
+      , ConsLayer0[M, S, W, In, Out, Out, HNil, NNil0[M, S, Out]]
+    ] {
+      def convert2Learn(
+        ls: ConsLayer0[M, S, W, In, Out, Out, HNil, NNil0[M, S, Out]]
+      )(
+        eps: S
+      , cost: MatrixFunction2[M, S]
+      ): HLearn[M[S, W] :: HNil, M[S, In], M[S, Out]] = {
+        ParaFn2Learn3(NNetLayer2ParaFn3(ls.h))(eps, cost)
+      }
+
+    }
+
+    implicit def cons[
+      M[a, d <: Dim], S, W <: Dim2[_, _], In <: Dim2[_, _], Hidden <: Dim2[_, _], Out <: Dim2[_, _]
+    , WS <: HList
+    , L <: Layers0[M, S, WS, Hidden, Out]
+    ](implicit
+      mat: MatrixCalculus[M, S]
+    , pmod: Module[M[S, W] :: HNil, S]
+    , mNorm: DimNorm[Hidden, S]
+    , rMultGroup: MultiplicativeGroup[S]
+    , next: Layers2HLearn0[M, S, Hidden, Out, WS, L]
+    // , prepend : Prepend.Aux[M[S, H x InR] :: HNil, CS, M[S, H x InR] :: CS]
+    // , take: Take.Aux[M[S, W] :: CS, Nat._1, M[S, H x InR] :: HNil]
+    // , drop: Drop.Aux[M[S, H x InR] :: CS, Nat._1, CS]
+    ) = new Layers2HLearn0[
+        M, S, In, Out
+      , M[S, W] :: WS
+      , ConsLayer0[M, S, W, In, Hidden, Out, WS, L]
+    ] {
+      def convert2Learn(
+        ls: ConsLayer0[M, S, W, In, Hidden, Out, WS, L]
+      )(
+        eps: S
+      , cost: MatrixFunction2[M, S]
+      ): HLearn[M[S, W] :: WS, M[S, In], M[S, Out]] = {
+        ParaFn2Learn3(NNetLayer2ParaFn3(ls.h))(eps, cost).andThen(
+          next.convert2Learn(ls.t)(eps, cost)
+        )
+      }
+    }
+
+  }
+
+  // def net2Learn[
+  //   M[a, d <: Dim], S, InR <: XInt, OutR <: XInt, OutC <: XInt
+  // , CS <: HList
+  // , L <: Layers[M, S, InR, OutR, OutC, CS]
+  // ](l: L)(
+  //   eps: S
+  // , cost: MatrixFunction2[M, S]
+  // )/*(
+  //   implicit conv: Layers2HLearn[M, S, InR, OutR, OutC, CS, L]
+  // )*/: HLearn[CS, M[S, InR x OutC], M[S, OutR x OutC]] = ??? //conv.convert2Learn(l)(eps, cost)
+
+  // def NNetHList2Learn[
+  //   M[a, d <: Dim], S, InR <: XInt, Hidden <: XInt, OutR <: XInt, OutC <: XInt, K <: XInt, SuccK <: XInt
+  // , L <: Layers[M, S, InR, OutR, OutC, SuccK]
+  // ](
+  //   layers: L
+  // )(
+  //   eps: S
+  // , cost: MatrixFunction2[M, S]
+  // )(implicit
+  //   hcons: HConsLayers.Aux[M, S, InR, OutR, OutC, K, SuccK, L, Hidden]
+  // , mat: MatrixCalculus[M, S]
+  // , pmod: Module[M[S, Hidden x InR], S]
+  // , mNorm: DimNorm[Hidden x OutC, S]
+  // , rMultGroup: MultiplicativeGroup[S]
+  // // not useful... just to display things in debug mode
+  // , showP: Show[M[S, Hidden x InR]]
+  // , showA: Show[M[S, InR x OutC]]
+  // ): Learn.Aux[M[S, OutR x InR], M[S, InR x OutC], M[S, OutR x OutC]] = {
+  //   val h: NNetLayer[M, S, InR, Hidden, OutC] = hcons.head(layers)
+  //   ParaFn2Learn2(NNetLayer2ParaFn(h))(eps, cost)
+  //   val t = hcons.tail(layers)
+  //   NNetHList2Learn[M, RS, InR, Hidden, OutR, OutC, K](t)(eps, cost)
+  // }
 }
 
 
+
+// final case class Layers2HLearnOps[
+//   M[a, d <: Dim], S, InR <: XInt, OutR <: XInt, OutC <: XInt, CS <: HList
+// , L <: Layers[M, S, InR, OutR, OutC, CS]
+// ](l : L) extends Serializable {
+
+//   def toLearn(
+//     eps: S
+//   , cost: MatrixFunction2[M, S]
+//   )(
+//     implicit conv: Layers2HLearn[M, S, InR, OutR, OutC, CS, L]
+//   ): HLearn[CS, M[S, InR x OutC], M[S, OutR x OutC]] = conv.convert2Learn(l)(eps, cost)
+
+// }

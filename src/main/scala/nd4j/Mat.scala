@@ -11,10 +11,16 @@ import cats.Show
 import spire.algebra.{Module, Rng}
 import shapeless.ops.hlist.IsHCons
 
+import shapeless.{HNil, ::}
+
 /**
   * A compile-time sized array relying on ND4J INDArray
   */
-class Mat[R, D <: Dim] private[neurocat] (val value: INDArray)
+class Mat[S, D <: Dim] private[neurocat] (val value: INDArray) {
+  def transpose(implicit transp: Transposable[D]): Mat[S, transp.R] = {
+    new Mat[S, transp.R](value.transpose())
+  }
+}
 
 object Mat {
 
@@ -137,12 +143,12 @@ object Mat {
   , trainDataOut: Mat[S, NbSamples x OutRows]
   )(
     implicit nbSamples: SafeInt[NbSamples]
-    , showInRow: Show[Mat[S, InRows x 1]]
-    , showOutRows: Show[Mat[S, OutRows x 1]]
-    , showP: Show[P]
+    // , showInRow: Show[Mat[S, InRows x 1]]
+    // , showOutRows: Show[Mat[S, OutRows x 1]]
+    // , showP: Show[P]
   ): P = {
     var params: P = initParams
-    println(s"params0:${showP.show(params)}")
+    // println(s"params0:${showP.show(params)}")
     (0 until 10).foreach { _ =>
       (0 until nbSamples).foreach { i =>
         val inRow = new Mat[S, InRows x 1](trainDataIn.value.getRow(i).transpose())
@@ -187,7 +193,7 @@ case class ProductDataSet[Row1, Row2, NbSamples <: XInt] private(
 case class SingleDataSet[S, D <: Dim, NbSamples <: XInt : SafeInt] private(data: INDArray) extends DataSet[Mat[S, D], NbSamples] {
 
   private[nd4j] def getRow(i: Int): Mat[S, D] = {
-    new Mat[S, D](data.getRow(i))
+    new Mat[S, D](data.getRow(i).transpose())
   }
 
   def getRow[I <: XInt](
@@ -205,15 +211,31 @@ object DataSet {
   }
 
   trait DataSetBuilder[NbSamples <: XInt] {
-    def apply[S, Cols <: XInt, NbSamples <: XInt : SafeInt](
+    def apply[S, Cols <: XInt](
       data: Mat[S, NbSamples x Cols]
-    ): DataSet[Mat[S, Cols x 1], NbSamples]
+    )(implicit nbSamples: SafeInt[NbSamples]): DataSet[Mat[S, Cols x 1], NbSamples]
   }
 
   def apply[NbSamples <: XInt] = new DataSetBuilder[NbSamples] {
-    def apply[S, Cols <: XInt, NbSamples <: XInt : SafeInt](
+    def apply[S, Cols <: XInt](
       data: Mat[S, NbSamples x Cols]
-    ): DataSet[Mat[S, Cols x 1], NbSamples] =
+    )(implicit nbSamples: SafeInt[NbSamples]): DataSet[Mat[S, Cols x 1], NbSamples] =
       SingleDataSet[S, Cols x 1, NbSamples](data.value)
   }
+
+  // abstract class DataSetBuilder2[Rows <: XInt, NbSamples <: XInt : SafeInt] {
+  //   def apply[S](
+  //     data: Mat[S, NbSamples x Rows]
+  //   ): DataSet[Mat[S, Rows x 1], NbSamples]
+  // }
+
+
+  // def apply[RowDim <: Dim2[_, 1], NbSamples <: XInt : SafeInt](
+  //   implicit rcs: RowsCols[RowDim]
+  // ) = new DataSetBuilder2[rcs.Rows, NbSamples] {
+  //   def apply[S](
+  //     data: Mat[S, NbSamples x rcs.Rows]
+  //   ): DataSet[Mat[S, rcs.Rows x 1], NbSamples] =
+  //     SingleDataSet[S, rcs.Rows x 1, NbSamples](data.value)
+  // }
 }

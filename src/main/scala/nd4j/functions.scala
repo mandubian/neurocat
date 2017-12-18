@@ -54,7 +54,7 @@ object Activation {
 
 object Loss {
 
-  def L2[R, D <: Dim2[_, _]] = new PartialDifferentiableInvertible2[Mat[R, D], 1] {
+  def localL2[R, D <: Dim] = new PartialDifferentiableInvertible2[Mat[R, D], 1] {
     def apply(x:Mat[R, D]) = { (y:Mat[R, D]) =>
       val scoreArr = x.value.rsub(y.value)
       new Mat[R, D](scoreArr.muli(scoreArr).muli(0.5))
@@ -68,5 +68,9 @@ object Loss {
       new Mat(x.value.sub(y.value))
     }
 
+  }
+
+  def L2[R] = new MatrixFunction2[Mat, R] {
+    def apply[D <: Dim]: PartialDifferentiableInvertible2[Mat[R, D], 1] = localL2[R, D]
   }
 }

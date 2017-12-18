@@ -4,6 +4,10 @@ scalaVersion in ThisBuild := "2.12.4-bin-typelevel-4"
 
 scalacOptions in ThisBuild ++= Seq(
   "-Yliteral-types"
+, "-Ypartial-unification"
+, "-feature"
+, "-language:higherKinds"
+, "-language:implicitConversions"
 )
 
 libraryDependencies ++= Seq(

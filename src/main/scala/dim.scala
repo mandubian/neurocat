@@ -77,6 +77,8 @@ object HasRowsCols {
 
 
 trait RowsCols[D] {
+  type Rows <: XInt
+  type Cols <: XInt
   def rows: Int
   def cols: Int
 }
@@ -85,6 +87,8 @@ object RowsCols {
   implicit def d2[A <: XInt, B <: XInt](
     implicit opA: SafeInt[A], opB: SafeInt[B]
   ) = new RowsCols[A x B] {
+    type Rows = A
+    type Cols = B
     def rows = opA.value
     def cols = opB.value
   }
