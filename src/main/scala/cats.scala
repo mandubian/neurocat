@@ -11,3 +11,13 @@ trait MonoidalCat[F[_, _]] extends Category[F] {
 trait SymmetricMonoidalCat[F[_, _]] extends MonoidalCat[F] {
   def braiding[A, B, C, D](l: F[(A, C), (B, D)]): F[(C, A), (D, B)]
 }
+
+
+trait Comonoid[M] {
+  def split(m: M): (M, M)
+  def destroy(m: M): Unit
+}
+
+object Comonoid {
+  def apply[M](implicit M: Comonoid[M]): Comonoid[M] = M
+}

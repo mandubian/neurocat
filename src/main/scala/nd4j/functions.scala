@@ -20,7 +20,9 @@ object Body {
       }
 
       def diffPerA(weights: Mat[R, OutR x InR])(in: Mat[R, InR x OutC])(e: Mat[R, OutR x OutC]): Mat[R, InR x OutC] = {
-        new Mat[R, InR x OutC](e.value.mmul(weights.value.transpose()))
+        // WHY THAT WAS THERE... FALSE!!!
+        // new Mat[R, InR x OutC](e.value.mmul(weights.value.transpose()))
+        new Mat[R, InR x OutC](weights.value.transpose().mmul(e.value))
       }
     }
 }
