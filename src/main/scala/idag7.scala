@@ -6,7 +6,7 @@ import cats.Monoid
 
 import algebra.ring.{MultiplicativeMonoid, AdditiveMonoid}
 
-import shapeless.ops.record._
+// import shapeless.ops.record._
 
 // import shapeless.record._
 import shapeless.labelled._
@@ -17,60 +17,17 @@ import cats.evidence._
 import singleton.ops._
 import org.nd4j.linalg.factory.Nd4j
 import nd4j._
+import typeclasses._
 
-
-sealed trait PDag[P, A, B, GradP, GradA, V[ctx, o[p, a, b, gp, ga]] <: PDag.Compiler[ctx, o]] {
-
-  // the ugly GADT patch
-  def compile[Ctx, Out[p, a, b, gp, ga], V2[ctx, o[p, a, b, gp, ga]] <: V[ctx, o]](
-    compiler: V2[Ctx, Out]
-  )(implicit ev: V2[Ctx, Out] <~< V[Ctx, Out]): Out[P, A, B, GradP, GradA]
-
-}
-
-trait Merger[P, Q]{
+trait GradCompose[F, G, V[ctx, o[p, a, b, gp, ga]] <: PDag.Compiler[ctx, o]] {
   type Out
-  def left(p: Out): P
-  def right(p: Out): Q
-  def apply(p: P, q: Q): Out
-} 
-
-object Merger extends Merger2 {
-
-  implicit def hnilMerger[P]: Merger.Aux[HNil, P, P] = new Merger[HNil, P] {
-    type Out = P
-
-    def left(pq: P): HNil = HNil
-    def right(p: P): P = p
-    def apply(hnil: HNil, p: P): P = p
-  }
+  def apply(): PDag[HNil, (G, F), Out, HNil, HNil, V]
 }
 
-trait Merger2 extends Merger3 {
-
-  implicit def hnil2Merger[P]: Merger.Aux[P, HNil, P] = new Merger[P, HNil] {
-    type Out = P
-
-    def left(p: P): P = p
-    def right(p: P): HNil = HNil
-    def apply(p: P, hnil: HNil): P = p
-  }
-
+object GradCompose {
+  type Aux[F, G, FG, V[ctx, o[p, a, b, gp, ga]] <: PDag.Compiler[ctx, o]] = GradCompose[F, G, V] { type Out = FG }
 }
 
-trait Merger3 {
-  type Aux[P, Q, PQ0] = Merger[P, Q] { type Out = PQ0 }
-
-  implicit def hlistMerger[P <: HList, Q <: HList](
-    implicit m: MergerE[P, Q]
-  ): Merger.Aux[P, Q, m.Out] = new Merger[P, Q] {
-    type Out = m.Out
-
-    def left(pq: Out): P = m.left(pq)
-    def right(pq: Out): Q = m.right(pq)
-    def apply(p: P, q: Q): Out = m(p, q)
-  }
-}
 
 trait CanMult[A, B, V[ctx, o[p, a, b, gp, ga]] <: PDag.Compiler[ctx, o]] {
   type Out
@@ -85,73 +42,15 @@ trait CanSub[A, V[ctx, o[p, a, b, gp, ga]] <: PDag.Compiler[ctx, o]] {
   def apply(): PDag[HNil, (A, A), A, HNil, HNil, V]
 }
 
-trait Norm[A, S] {
-  def norm: S
+sealed trait PDag[P, A, B, GradP, GradA, V[ctx, o[p, a, b, gp, ga]] <: PDag.Compiler[ctx, o]] {
+
+  // the ugly GADT patch
+  def compile[Ctx, Out[p, a, b, gp, ga], V2[ctx, o[p, a, b, gp, ga]] <: V[ctx, o]](
+    compiler: V2[Ctx, Out]
+  )(implicit ev: V2[Ctx, Out] <~< V[Ctx, Out]): Out[P, A, B, GradP, GradA]
+
 }
 
-
-trait Zeroed[A] {
-  def zero: A
-}
-
-object Zeroed {
-  def apply[A](implicit zeroed: Zeroed[A]) = zeroed
-}
-
-
-trait Oned[A] {
-  def one: A
-}
-
-object Oned {
-  def apply[A](implicit oned: Oned[A]) = oned
-}
-
-
-trait GradCompose[F, G, V[ctx, o[p, a, b, gp, ga]] <: PDag.Compiler[ctx, o]] {
-  type Out
-  def apply(): PDag[HNil, (G, F), Out, HNil, HNil, V]
-}
-
-object GradCompose {
-  type Aux[F, G, FG, V[ctx, o[p, a, b, gp, ga]] <: PDag.Compiler[ctx, o]] = GradCompose[F, G, V] { type Out = FG }
-}
-
-
-trait TypeCompiler[P] {
-  type Out
-  def compile(p: P): Out
-}
-object TypeCompiler {
-  type Aux[P, O] = TypeCompiler[P] { type Out = O }
-}
-
-
-trait Tuplizer[P, A] {
-  type Out
-
-  def tuplize(p: P, a: A): Out
-  def untuplize(pa: Out): (P, A)
-}
-
-object Tuplizer extends TuplizerImplicits{
-
-  implicit def tupl0[A] = new Tuplizer[HNil, A] {
-    type Out = A
-    def tuplize(p: HNil, a: A): A = a
-    def untuplize(pa: A): (HNil, A) = (HNil, pa)
-  }
-}
-
-trait TuplizerImplicits {
-  type Aux[P, A, O] = Tuplizer[P, A] { type Out = O }
-
-  implicit def tupl1[P, A] = new Tuplizer[P, A] {
-    type Out = (P, A)
-    def tuplize(p: P, a: A): (P, A) = (p, a)
-    def untuplize(pa: (P, A)): (P, A) = pa
-  }
-}
 object PDag {
   
   implicit def mmab[A : MultiplicativeMonoid, B : MultiplicativeMonoid] =
@@ -805,15 +704,6 @@ object NNet {
 
 
 
-
-trait ParametrisedFunction[P, A, B] extends Function2[P, A, B]
-
-trait ParametrisedDiff[P, A, B, GradP, GradA] extends ParametrisedFunction[P, A, B] {
-  def gradP(p: P, a: A): GradP
-  def gradA(p: P, a: A): GradA
-}
-
-
 trait DagDsl[V[ctx, o[p, a, b, gp, ga]] <: PDag.Compiler[ctx, o]] {
   type ProdPDag[
     P, PA, PB, PGP, PGA
@@ -869,15 +759,6 @@ trait ND4JDsl[V[ctx, o[p, a, b, gp, ga]] <: NNet.Compiler[ctx, o]] extends DagDs
 }
 
 
-sealed trait Mat[S, D <: Dim2[_, _]]
-
-case class Matrix[S, D <: Dim2[_, _]]() extends Mat[S, D]
-case class Identity[S, R <: XInt]() extends Mat[S, R x R]
-case class One[S, D <: Dim2[_, _]]() extends Mat[S, D]
-case class Zero[S, D <: Dim2[_, _]]() extends Mat[S, D]
-case class Diag[S, R <: XInt]() extends Mat[S, R x R]
-
-
 
 trait ND4J
 
@@ -928,21 +809,21 @@ object Test {
       NNet.MatMult[R, A, B, C, V]()
   }
 
-  implicit def matZeroed[
-    R, A <: XInt, B <: XInt
-  ] = new Zeroed[Mat[R, A x B]] {
-    def zero = Zero[R, A x B]()
-  }
+  // implicit def matZeroed[
+  //   R, A <: XInt, B <: XInt
+  // ] = new Zeroed[Mat[R, A x B]] {
+  //   def zero = Zero[R, A x B]()
+  // }
 
-  implicit def matOned[
-    R, A <: XInt
-  ] = new Oned[Mat[R, A x 1]] {
-    def one = One[R, A x 1]()
-  }
+  // implicit def matOned[
+  //   R, A <: XInt
+  // ] = new Oned[Mat[R, A x 1]] {
+  //   def one = One[R, A x 1]()
+  // }
 
-  def nnetlayer[S, InR <: XInt, OutR <: XInt] = 
-    (denseLayer["s", S, InR x 1, OutR x 1] >>> sigmoid) ||
-      (denseLayer["t", S, InR x 1, OutR x 1] >>> sigmoid)
+  // def nnetlayer[S, InR <: XInt, OutR <: XInt] = 
+  //   (denseLayer["s", S, InR x 1, OutR x 1] >>> sigmoid) ||
+  //     (denseLayer["t", S, InR x 1, OutR x 1] >>> sigmoid)
 
 
   // implicit val ND4JTrans = new Compiler[ND4J, ND4J.ND4JParametrisedDiff] { self =>
