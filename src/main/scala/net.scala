@@ -3,6 +3,7 @@ package neurocat
 import shapeless.{HList, HNil, ::}
 
 import singleton.ops._
+import functions._
 
 
 /* a neural network in euclidean space is defined by layers composed together

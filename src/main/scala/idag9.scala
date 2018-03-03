@@ -16,22 +16,6 @@ import org.nd4j.linalg.factory.Nd4j
 import nd4j._
 import typeclasses._
 
-sealed trait Valued[+A]
-
-// case class IdV[A]() extends Valued[A] {
-//   def value(implicit d: DiagOned[A]): A = d.diagOne
-// }
-// case class ZeroV[A]() extends Valued[A] {
-//   def value(implicit d: Zeroed[A]): A = d.zero
-// }
-
-// case class V[A](a: A) extends Valued[A] {
-//   def value: A = a
-// }
-
-// trait NoneV extends Valued[Nothing]
-// case object NoneV extends NoneV
-
 
 trait DagAlgebra[Ctx, Alg[out[p, a, b]] <: DagAlgebra[Ctx, Alg, out], Out[p, a, b]]
   extends Dag.Id.Algebra[Ctx, Alg, Out]
@@ -50,8 +34,6 @@ trait DagAlgebra[Ctx, Alg[out[p, a, b]] <: DagAlgebra[Ctx, Alg, out], Out[p, a, 
   self =>
   import Dag._
     
-  // def noneV[P, A]: Out[P, A, NoneV]
-
 }
 
 trait Dag[Ctx, P, A, B, Alg[out[p, a, b]] <: DagAlgebra[Ctx, Alg, out]] {
@@ -922,7 +904,7 @@ object Learn {
   trait LearnAlgebra[Ctx, Out[p, a, b]]
     extends DagAlgebra[Ctx, Lambda[out[p, a, b] => LearnAlgebra[Ctx, out]], Out]
 
-  class LearnCompiler[
+  abstract class LearnCompiler[
     Ctx
   ](
     dsl0: DagDsl[Ctx, Lambda[out[p, a, b] => LearnAlgebra[Ctx, out]]]
@@ -1464,10 +1446,6 @@ object Test {
   val prdF = prd.compile(ND4JAlgebra)
   val (a, b) = prdF(HNil, 5)
 
-  // implicit val d: DiagOned[Double] = ???
-
-
-  // idVradF(HNil, 5)
 }
 
 

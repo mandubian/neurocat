@@ -74,27 +74,9 @@ trait Merger2 extends Merger3 {
     def right(p: P): HNil = HNil
     def apply(p: P, hnil: HNil): P = p
   }
-
-  implicit def mergerSwitch[P, Q, PQ](implicit m: Merger.Aux[P, Q, PQ]): Merger.Aux[Q, P, PQ] = new Merger[Q, P] {
-    type Out = PQ
-
-    def left(pq: PQ): Q = m.right(pq)
-    def right(pq: PQ): P = m.left(pq)
-    def apply(q: Q, p: P): PQ = m(p, q)
-  }
-
-  implicit def remergerLeft[P, Q, PQ](implicit m: Merger.Aux[P, Q, PQ]): Merger.Aux[PQ, P, PQ] = new Merger[PQ, P] {
-    type Out = PQ
-
-    def left(pq: PQ): PQ = pq
-    def right(pq: PQ): P = m.left(pq)
-    // overwrite P?
-    def apply(pq: PQ, p: P): PQ = m.apply(p, m.right(pq))
-  }
 }
 
-trait Merger3 {
-  type Aux[P, Q, PQ0] = Merger[P, Q] { type Out = PQ0 }
+trait Merger3 extends Merger4 {
 
   implicit def hlistMerger[P <: HList, Q <: HList](
     implicit m: MergerE[P, Q]
@@ -106,6 +88,21 @@ trait Merger3 {
     def apply(p: P, q: Q): Out = m(p, q)
   }
 
+}
+
+trait Merger4 extends Merger5 {
+
+  implicit def remergerLeft[P, Q, PQ](implicit m: Merger.Aux[P, Q, PQ]): Merger.Aux[PQ, P, PQ] = new Merger[PQ, P] {
+    type Out = PQ
+
+    def left(pq: PQ): PQ = pq
+    def right(pq: PQ): P = m.left(pq)
+    // overwrite P?
+    def apply(pq: PQ, p: P): PQ = m.apply(p, m.right(pq))
+  }
+}
+
+trait Merger5 extends Merger6 {
 
   implicit def remergerRight[P, Q, PQ](implicit m: Merger.Aux[P, Q, PQ]): Merger.Aux[PQ, Q, PQ] = new Merger[PQ, Q] {
     type Out = PQ
@@ -114,6 +111,19 @@ trait Merger3 {
     def right(pq: PQ): Q = m.right(pq)
     // overwrite P?
     def apply(pq: PQ, q: Q): PQ = m.apply(m.left(pq), q)
+  }
+
+}
+
+trait Merger6 {
+  type Aux[P, Q, PQ0] = Merger[P, Q] { type Out = PQ0 }
+
+  implicit def mergerSwitch[P, Q, PQ](implicit m: Merger.Aux[P, Q, PQ]): Merger.Aux[Q, P, PQ] = new Merger[Q, P] {
+    type Out = PQ
+
+    def left(pq: PQ): Q = m.right(pq)
+    def right(pq: PQ): P = m.left(pq)
+    def apply(q: Q, p: P): PQ = m(p, q)
   }
 
 }

@@ -3,6 +3,7 @@ package nd4j
 
 import singleton.ops._
 import org.nd4j.linalg.factory.Nd4j
+import functions._
 
 object Body {
   def Dense[R, InR <: XInt, OutR <: XInt, OutC <: XInt] =

@@ -134,6 +134,17 @@ object Mat {
   //   }
   // }
 
+  implicit def addGroup[S, R <: XInt : SafeInt, C <: XInt : SafeInt] = new algebra.ring.AdditiveGroup[Mat[S, R x C]] {
+    def zero: Mat[S, R x C] =
+      new Mat[S, R x C](Nd4j.zeros(Array(implicitly[SafeInt[R]].value, implicitly[SafeInt[C]].value), Nd4j.order()))
+    
+    def plus(x: Mat[S, R x C], y: Mat[S, R x C]): Mat[S, R x C] =
+      new Mat[S, R x C](x.value.add(y.value))
+
+    def negate(a: Mat[S, R x C]): Mat[S, R x C] =
+      new Mat[S, R x C](a.value.negi())
+  }
+
   // hard coded for Mat for now
   def train[P, S, InRows <: XInt, OutRows <: XInt, NbSamples <: XInt](
     learn: Learn.Aux[P, Mat[S, InRows x 1], Mat[S, OutRows x 1]]

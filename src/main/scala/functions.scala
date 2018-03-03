@@ -1,4 +1,5 @@
 package neurocat
+package functions
 
 import singleton.ops._
 

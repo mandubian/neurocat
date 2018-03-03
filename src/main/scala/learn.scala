@@ -11,6 +11,7 @@ import spire.math._
 import spire.algebra._
 
 import singleton.ops._
+import functions._
 
 /**
   * Learn structure represents a Supervised Learning Algorithm
