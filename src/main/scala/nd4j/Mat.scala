@@ -6,6 +6,7 @@ import singleton.ops._
 import org.nd4j.linalg.factory.Nd4j
 import org.nd4j.linalg.api.ndarray.INDArray
 import org.nd4j.linalg.factory.NDArrayFactory
+import org.nd4j.linalg.indexing.NDArrayIndex
 
 import cats.Show
 import spire.algebra.{Module, Rng}
@@ -173,12 +174,14 @@ object Mat {
   }  
 }
 
-sealed abstract class DataSet[Row, NbSamples <: XInt](
-  implicit nbSamples: SafeInt[NbSamples]
-) {
+trait DataSet[Row, NbSamples] {
   private[nd4j] def getRow(i: Int): Row
 
-  def foreachRow[U](f: Row => U): Unit = {
+  def length(implicit nbSamples: SafeInt[NbSamples]): Int = nbSamples
+
+  def slice[From <: XInt, To <: XInt](implicit p : To - From, from: SafeInt[From], to: SafeInt[To]): DataSet[Row, p.Out]
+
+  def foreachRow[U](f: Row => U)(implicit nbSamples: SafeInt[NbSamples]): Unit = {
     (0 until nbSamples).foreach { i =>
       f(getRow(i))
     }
@@ -189,23 +192,27 @@ sealed abstract class DataSet[Row, NbSamples <: XInt](
   }
 } 
 
-case class ProductDataSet[Row1, Row2, NbSamples <: XInt] private(
+case class ProductDataSet[Row1, Row2, NbSamples] private(
   d1: DataSet[Row1, NbSamples], d2: DataSet[Row2, NbSamples]
-)(
-  implicit nbSamples: SafeInt[NbSamples]
 ) extends DataSet[(Row1, Row2), NbSamples] {
 
   private[nd4j] def getRow(i: Int): (Row1, Row2) = {
     (d1.getRow(i), d2.getRow(i))
   }
 
+  def slice[From <: XInt, To <: XInt](implicit p : To - From, from: SafeInt[From], to: SafeInt[To]): DataSet[(Row1, Row2), p.Out] =
+    ProductDataSet(d1.slice[From, To], d2.slice[From, To])
+
 } 
 
-case class SingleDataSet[S, D <: Dim, NbSamples <: XInt : SafeInt] private(data: INDArray) extends DataSet[Mat[S, D], NbSamples] {
+case class SingleDataSet[S, D <: Dim, NbSamples] private(data: INDArray) extends DataSet[Mat[S, D], NbSamples] {
 
   private[nd4j] def getRow(i: Int): Mat[S, D] = {
     new Mat[S, D](data.getRow(i).transpose())
   }
+
+  def slice[From <: XInt, To <: XInt](implicit p : To - From, from: SafeInt[From], to: SafeInt[To]): DataSet[Mat[S, D], p.Out] =
+    SingleDataSet[S, D, p.Out](data.get(NDArrayIndex.interval(from, to), NDArrayIndex.all()))
 
   def getRow[I <: XInt](
     implicit i: Require[I < NbSamples] ==> SafeInt[I]
@@ -215,9 +222,17 @@ case class SingleDataSet[S, D <: Dim, NbSamples <: XInt : SafeInt] private(data:
 
 }
 
+trait RowTraversable[DS[r, nb]] {
+  def foreachRow[Row, NbSamples, U](a: DS[Row, NbSamples])(f: Row => U)(
+    implicit nbSamples: SafeInt[NbSamples]
+  ): Unit
+}
+
 object DataSet {
   implicit val rowTraversable: RowTraversable[DataSet] = new RowTraversable[DataSet] {
-    def foreachRow[Row, NbSamples <: XInt, U](a: DataSet[Row, NbSamples])(f: Row => U): Unit =
+    def foreachRow[Row, NbSamples, U](a: DataSet[Row, NbSamples])(f: Row => U)(
+      implicit nbSamples: SafeInt[NbSamples]
+    ): Unit =
       a.foreachRow(f)
   }
 

@@ -26,11 +26,12 @@ with SlideL.Dsl[S, Alg] {
   , Q, QA, QB
   ](f: Dag[P, PA, PB, S, Alg], g: Dag[Q, QA, QB, S, Alg])(
     implicit merger0: Merger[P, Q]
-  ): Dag[merger0.Out, (PA, QA), (PB, QB), S, Alg] =
+  ): Dag[merger0.Out, (PA, QA), (PB, QB), S, Alg] = {
     prod(
       compose(f, fst[PA, QA])
     , compose(g, snd[PA, QA])
-    ) 
+    )
+  }
 
   def assocR[
     A, B, C
@@ -83,10 +84,9 @@ with SlideL.DiffDsl[S, Alg] {
   def par[
     P, PA : AdditiveGroup, PB
   , Q, QA : AdditiveGroup, QB
-  , PQ
   ](f: DiffDag[P, PA, PB, S, Alg], g: DiffDag[Q, QA, QB, S, Alg])(
     implicit
-    merger0: Merger.Aux[P, Q, PQ]
+    merger0: Merger[P, Q]
   , costPAQA: CostDiffInvertBuilder[(PA, QA), S, Alg]
   , costPA: CostDiffBuilder[PA, S, Alg]
   , costPB: CostDiffBuilder[PB, S, Alg]
@@ -100,7 +100,7 @@ with SlideL.DiffDsl[S, Alg] {
   , minusQ: MinusPBuilder[Q, S, Alg]
   , scalarTimesP: ScalarTimesBuilder[P, S, Alg]
   , scalarTimesQ: ScalarTimesBuilder[Q, S, Alg]
-  ): DiffDag[PQ, (PA, QA), (PB, QB), S, Alg] = {
+  ): DiffDag[merger0.Out, (PA, QA), (PB, QB), S, Alg] = {
     val a = compose(f, fst[PA, QA])
     val b = compose(g, snd[PA, QA])
     prod(a, b)

@@ -23,10 +23,6 @@ object L2 {
       def apply() = new CostL2DiffInvert()
     }
 
-  implicit def scalarTimesBuilder[S, D <: Dim, Alg[out[p, a, b]] <: nd4j.DiffAlgebra[S, Alg, out]] =
-    new ScalarTimesBuilder[Mat[S, D], S, Alg] {
-      def apply() = new ScalarTimes()
-    }
 }
 
 

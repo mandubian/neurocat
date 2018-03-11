@@ -12,33 +12,37 @@ package object idag {
     dag: DiffDag[P, PA, PB, S, Alg]
   ) extends DiffDagDsl[S, Alg] {
 
-    def >>>[Q, QC, QGP, QGA, PQ](other: DiffDag[Q, PB, QC, S, Alg])(
+    def >>>[Q, QC, QGP, QGA](other: DiffDag[Q, PB, QC, S, Alg])(
       implicit
-        merger: Merger.Aux[P, Q, PQ]
-      , cpa: CostBuilder[PA, S, Alg], cqc: CostBuilder[QC, S, Alg]
+        merger: Merger[P, Q]
+      , cpa: CostBuilder[PA, S, Alg]
+      , cqc: CostBuilder[QC, S, Alg]
       , costDiffInvertA: CostDiffInvertBuilder[PA, S, Alg]
-      , costDiffC: CostDiffBuilder[QC,S,Alg]
-      , minusPQ: MinusPBuilder[PQ, S, Alg]
+      , costDiffC: CostDiffBuilder[QC, S, Alg]
       , minusA0: MinusBuilder[PA, S, Alg]
-      , scalarTimesPQ: ScalarTimesBuilder[PQ, S, Alg]
-    ): DiffDag[PQ, PA, QC, S, Alg] = compose(other, dag)
+      , minusP0: MinusPBuilder[P, S, Alg]
+      , minusQ0: MinusPBuilder[Q, S, Alg]
+      , scalarTimesP0: ScalarTimesBuilder[P, S, Alg]
+      , scalarTimesQ0: ScalarTimesBuilder[Q, S, Alg]
+    ): DiffDag[merger.Out, PA, QC, S, Alg] = compose(other, dag)
 
     def **[Q, QB, QGP, QGA, PQ](other: DiffDag[Q, PA, QB, S, Alg])(
       implicit
-        merger: Merger.Aux[P, Q, PQ]
+        merger: Merger[P, Q]
       , paadd : AdditiveGroup[PA]
       , cpb: CostDiffBuilder[PB, S, Alg]
-      // , scalarTimesPB: ScalarTimesBuilder[PB, S, Alg]
       , cqb: CostDiffBuilder[QB, S, Alg]
       , costDiffInvertPA: CostDiffInvertBuilder[PA, S, Alg]
-      , minusPQ: MinusPBuilder[PQ, S, Alg]
       , minusPA: MinusBuilder[PA, S, Alg]
-      , scalarTimesPQ: ScalarTimesBuilder[PQ, S, Alg]
-    ): DiffDag[PQ, PA, (PB, QB), S, Alg] = prod(dag, other)
+      , minusP0: MinusPBuilder[P, S, Alg]
+      , minusQ0: MinusPBuilder[Q, S, Alg]
+      , scalarTimesP0: ScalarTimesBuilder[P, S, Alg]
+      , scalarTimesQ0: ScalarTimesBuilder[Q, S, Alg]
+    ): DiffDag[merger.Out, PA, (PB, QB), S, Alg] = prod(dag, other)
 
-    def ||[Q, QA : AdditiveGroup, QB, PQ](other: DiffDag[Q, QA, QB, S, Alg])(
+    def ||[Q, QA : AdditiveGroup, QB](other: DiffDag[Q, QA, QB, S, Alg])(
       implicit
-        merger: Merger.Aux[P, Q, PQ]
+        merger: Merger[P, Q]
       , paadd : AdditiveGroup[PA]
       , costDiffPA: CostDiffBuilder[PA, S, Alg]
       , costDiffPB: CostDiffBuilder[PB, S, Alg]
@@ -54,7 +58,7 @@ package object idag {
       , minusQ: MinusPBuilder[Q, S, Alg]
       , minusPA: MinusBuilder[PA, S, Alg]
       , minusQA: MinusBuilder[QA, S, Alg]
-    ): DiffDag[PQ, (PA, QA), (PB, QB), S, Alg] = par(dag, other)
+    ): DiffDag[merger.Out, (PA, QA), (PB, QB), S, Alg] = par(dag, other)
   }
 
 

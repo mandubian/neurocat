@@ -16,6 +16,7 @@ scalacOptions in Test  ++= Seq(
 , "-feature"
 , "-language:higherKinds"
 , "-language:implicitConversions"
+// , "-Xlog-implicits"
 )
 
 libraryDependencies ++= Seq(

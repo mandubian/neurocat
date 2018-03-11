@@ -110,27 +110,28 @@ object Compose {
     def compose[
       P, A, B, PGP, PGA
     , Q, C, QGP, QGA
-    , PQ
     ](g: DiffDag[Q, B, C, S, Alg], f: DiffDag[P, A, B, S, Alg])(
       implicit
-        merger0: Merger.Aux[P, Q, PQ]
+        merger0: Merger[P, Q]
       , costDiffInvertA: CostDiffInvertBuilder[A, S, Alg]
       , costDiffC: CostDiffBuilder[C, S, Alg]
       , minusA0: MinusBuilder[A, S, Alg]
-      , scalarTimesPQ: ScalarTimesBuilder[PQ, S, Alg]
-      , minusPQ: MinusPBuilder[PQ, S, Alg]
-    ): DiffDag[PQ, A, C, S, Alg]
+      , scalarTimesP0: ScalarTimesBuilder[P, S, Alg]
+      , scalarTimesQ0: ScalarTimesBuilder[Q, S, Alg]
+      , minusP0: MinusPBuilder[P, S, Alg]
+      , minusQ0: MinusPBuilder[Q, S, Alg]
+    ): DiffDag[merger0.Out, A, C, S, Alg]
     = new Compose.Diff[
         P, A, B, Q, C
-      , PQ
+      , merger0.Out
       , S, Alg
       ](g, f) {
         val merger = merger0
         val costDiffInvert = costDiffInvertA
         val costDiff = costDiffC
-        val scalarTimes = scalarTimesPQ
+        val scalarTimes = implicitly[ScalarTimesBuilder[merger0.Out, S, Alg]] //scalarTimesPQ
         val minusA = minusA0
-        val minusP = minusPQ
+        val minusP = implicitly[MinusPBuilder[merger0.Out, S, Alg]] //minusPQ
       }
   }  
 }

@@ -123,30 +123,31 @@ object Prod {
   ] {
 
     def prod[
-        P, PA : AdditiveSemigroup, PB, Q, QB, QGP
-      , PQ
+      P, PA : AdditiveSemigroup, PB, Q, QB, QGP
     ](
       f: DiffDag[P, PA, PB, S, Alg]
     , g: DiffDag[Q, PA, QB, S, Alg]
     )(
       implicit
-        merger0: Merger.Aux[P, Q, PQ]
+        merger0: Merger[P, Q]
       , costPA: CostDiffInvertBuilder[PA, S, Alg]
       , costPBQB: CostDiffBuilder[(PB, QB), S, Alg]
-      , scalarTimesPQ: ScalarTimesBuilder[PQ, S, Alg]
-      , minusPQ: MinusPBuilder[PQ, S, Alg]
       , minusPA: MinusBuilder[PA, S, Alg]
-    ): DiffDag[PQ, PA, (PB, QB), S, Alg]
+      , scalarTimesP0: ScalarTimesBuilder[P, S, Alg]
+      , scalarTimesQ0: ScalarTimesBuilder[Q, S, Alg]
+      , minusP0: MinusPBuilder[P, S, Alg]
+      , minusQ0: MinusPBuilder[Q, S, Alg]
+    ): DiffDag[merger0.Out, PA, (PB, QB), S, Alg]
     = new Prod.Diff[
         P, PA, PB, Q, QB
-      , PQ
+      , merger0.Out
       , S, Alg
       ](f, g) {
         val merger = merger0
         val costDiffInvert = costPA
         val costDiff = costPBQB
-        val scalarTimes = scalarTimesPQ
-        val minusP = minusPQ
+        val scalarTimes = implicitly[ScalarTimesBuilder[merger0.Out, S, Alg]] //scalarTimesPQ
+        val minusP = implicitly[MinusPBuilder[merger0.Out, S, Alg]] //minusPQ
         val minusA = minusPA
       }
 

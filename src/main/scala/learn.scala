@@ -12,6 +12,7 @@ import spire.algebra._
 
 import singleton.ops._
 import functions._
+import neurocat.nd4j._
 
 /**
   * Learn structure represents a Supervised Learning Algorithm
@@ -166,10 +167,10 @@ object Learn {
   object Trainer {
 
     def naive[
-      DataSet[row, nb <: XInt]
+      DataSet[row, nb]
     ](implicit rowTr: RowTraversable[DataSet]): Trainer[DataSet] =
       new Trainer[DataSet] {      
-        def train[Params <: HList, In, Out, NbSamples <: XInt](
+        def train[Params <: HList, In, Out, NbSamples <: XInt : SafeInt](
           learn: HLearn[Params, In, Out]
         )(
           initParams: Params

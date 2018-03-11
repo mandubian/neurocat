@@ -6,9 +6,9 @@ import shapeless.HList
 
 
 trait Trainer[
-  DataSet[row, nb <: XInt]
+  DataSet[row, nb]
 ] {
-  def train[Params <: HList, In, Out, NbSamples <: XInt](
+  def train[Params <: HList, In, Out, NbSamples <: XInt : SafeInt](
     learner: HLearn[Params, In, Out]
   )(
     initParams: Params

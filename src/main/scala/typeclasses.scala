@@ -1,7 +1,7 @@
 package neurocat
 package typeclasses
 
-import shapeless.{HList, HNil, ::, DepFn2}
+import shapeless.{HList, HNil, ::, DepFn2, Lazy}
 import cats.Monoid
 
 import algebra.ring.{MultiplicativeMonoid, AdditiveMonoid}
@@ -19,15 +19,6 @@ import org.nd4j.linalg.factory.Nd4j
 import nd4j._
 
 
-// sealed trait Mat[S, D <: Dim2[_, _]]
-
-// case class Matrix[S, D <: Dim2[_, _]]() extends Mat[S, D]
-// case class Identity[S, R <: XInt]() extends Mat[S, R x R]
-// case class One[S, D <: Dim2[_, _]]() extends Mat[S, D]
-// case class Zero[S, D <: Dim2[_, _]]() extends Mat[S, D]
-// case class Diag[S, R <: XInt]() extends Mat[S, R x R]
-
-
 trait ParametrisedFunction[P, A, B] extends Function2[P, A, B]
 
 trait ParametrisedDiff[P, A, B, GradP, GradA] extends ParametrisedFunction[P, A, B] {
@@ -43,26 +34,24 @@ trait Merger[P, Q]{
 } 
 
 object Merger extends Merger1 {
-  implicit def pMerger[P]: Merger.Aux[P, P, P] = new Merger[P, P] {
-    type Out = P
 
-    def left(p: P): P = p
-    def right(p: P): P = p
-    def apply(hnil: P, p: P): P = p
-  }
 
 
 }
 
 trait Merger1 extends Merger2 {
+  
+  implicit def hlistMerger[P <: HList, Q <: HList](
+    implicit m: MergerE[P, Q]
+  ): Merger.Aux[P, Q, m.Out] = new Merger[P, Q] {
+    type Out = m.Out
 
-  implicit def hnilMerger[P]: Merger.Aux[HNil, P, P] = new Merger[HNil, P] {
-    type Out = P
-
-    def left(pq: P): HNil = HNil
-    def right(p: P): P = p
-    def apply(hnil: HNil, p: P): P = p
+    def left(pq: Out): P = m.left(pq)
+    def right(pq: Out): Q = m.right(pq)
+    def apply(p: P, q: Q): Out = m(p, q)
   }
+
+  
 }
 
 trait Merger2 extends Merger3 {
@@ -78,19 +67,23 @@ trait Merger2 extends Merger3 {
 
 trait Merger3 extends Merger4 {
 
-  implicit def hlistMerger[P <: HList, Q <: HList](
-    implicit m: MergerE[P, Q]
-  ): Merger.Aux[P, Q, m.Out] = new Merger[P, Q] {
-    type Out = m.Out
+  implicit def hnilMerger[P]: Merger.Aux[HNil, P, P] = new Merger[HNil, P] {
+    type Out = P
 
-    def left(pq: Out): P = m.left(pq)
-    def right(pq: Out): Q = m.right(pq)
-    def apply(p: P, q: Q): Out = m(p, q)
+    def left(pq: P): HNil = HNil
+    def right(p: P): P = p
+    def apply(hnil: HNil, p: P): P = p
   }
-
 }
 
 trait Merger4 extends Merger5 {
+  implicit def idMerger[P]: Merger.Aux[P, P, P] = new Merger[P, P] {
+    type Out = P
+
+    def left(p: P): P = p
+    def right(p: P): P = p
+    def apply(hnil: P, p: P): P = p
+  }
 
   implicit def remergerLeft[P, Q, PQ](implicit m: Merger.Aux[P, Q, PQ]): Merger.Aux[PQ, P, PQ] = new Merger[PQ, P] {
     type Out = PQ

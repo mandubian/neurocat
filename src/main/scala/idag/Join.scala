@@ -68,9 +68,9 @@ object Join {
 
   trait Dsl[S, Alg[out[p, a, b]] <: DagAlgebra[S, Alg, out]] {
 
-    def join[A, B, C](
-      implicit merger0: Merger.Aux[A, B, C]
-    ): Dag[HNil, (A, B), C, S, Alg] = new Join[A, B, C, S, Alg] {
+    def join[A, B](
+      implicit merger0: Merger[A, B]
+    ): Dag[HNil, (A, B), merger0.Out, S, Alg] = new Join[A, B, merger0.Out, S, Alg] {
       val merger = merger0
     }
   }

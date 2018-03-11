@@ -37,6 +37,3 @@ object Transposable {
   }
 }
 
-trait RowTraversable[DS[r, nb <: XInt]] {
-  def foreachRow[Row, NbSamples <: XInt, U](a: DS[Row, NbSamples])(f: Row => U): Unit
-}

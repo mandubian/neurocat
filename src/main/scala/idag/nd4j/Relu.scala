@@ -24,7 +24,7 @@ extends Dag[HNil, Mat[S, R x C], Mat[S, R x C], S, Alg] {
 object Relu {
 
   abstract class Diff[
-    S, R <: XInt, C <: XInt
+    S, R <: XInt : SafeInt, C <: XInt : SafeInt
   , Alg[out[p, a, b]] <: nd4j.DiffAlgebra[S, Alg, out]
   ]()
   extends Relu[S, R, C, Alg] with DiffDag[HNil, Mat[S, R x C], Mat[S, R x C], S, Alg] {
@@ -59,7 +59,7 @@ object Relu {
   extends Algebra[S, Alg, Out] {
 
     def grada[
-      R <: XInt, C <: XInt
+      R <: XInt : SafeInt, C <: XInt : SafeInt
     ](
       dag: Relu.Diff[S, R, C, Alg]
     ): Out[HNil, (Mat[S, R x C], Mat[S, R x C]), Mat[S, R x C]]
@@ -70,5 +70,34 @@ object Relu {
       dag: Relu.Diff[S, R, C, Alg]
     ): Out[HNil, (Mat[S, R x C], Mat[S, R x C]), HNil]
   }
+
+  trait Dsl[S, Alg[out[p, a, b]] <: nd4j.Algebra[S, Alg, out]] {
+
+    def relu[R <: XInt, C <: XInt]: Dag[HNil, Mat[S, R x C], Mat[S, R x C], S, Alg] = new Relu()
+
+  }
+
+
+  trait DiffDsl[
+    S, Alg[out[p, a, b]] <: nd4j.DiffAlgebra[S, Alg, out]
+  ] {
+
+    def relu[R <: XInt : SafeInt, C <: XInt : SafeInt](
+      implicit
+        costDiffInvertRC: CostDiffInvertBuilder[Mat[S, R x C], S, Alg]
+      , costDiffRC: CostDiffBuilder[Mat[S, R x C], S, Alg]
+      , scalarTimesHNil: ScalarTimesBuilder[HNil, S, Alg]
+      , minusA0: MinusBuilder[Mat[S, R x C], S, Alg]
+      , minusP0: MinusPBuilder[HNil, S, Alg]
+    ): DiffDag[HNil, Mat[S, R x C], Mat[S, R x C], S, Alg] =
+      new Relu.Diff[S, R, C, Alg] {
+        val costDiffInvert = costDiffInvertRC
+        val costDiff = costDiffRC
+        val scalarTimes = scalarTimesHNil
+        val minusA = minusA0
+        val minusP = minusP0
+      }
+  }
+  
 }
 

@@ -69,10 +69,10 @@ object Split {
   trait Dsl[S, Alg[out[p, a, b]] <: DagAlgebra[S, Alg, out]] {
 
     def split[
-      A, B, C
+      B, C
     ](
-      implicit merger0: Merger.Aux[B, C, A]
-    ): Dag[HNil, A, (B, C), S, Alg] = new Split[A, B, C, S, Alg] {
+      implicit merger0: Merger[B, C]
+    ): Dag[HNil, merger0.Out, (B, C), S, Alg] = new Split[merger0.Out, B, C, S, Alg] {
       val merger = merger0
     }
   

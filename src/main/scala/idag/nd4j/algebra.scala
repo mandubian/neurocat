@@ -20,6 +20,7 @@ with CostL2DiffInvert.Algebra[S, Alg, Out]
 with ScalarTimes.Algebra[S, Alg, Out]
 with Minus.Algebra[S, Alg, Out]
 with Func.Algebra[S, Alg, Out]
+with Dense.Algebra[S, Alg, Out]
 
 
 
@@ -30,3 +31,4 @@ with Sigmoid.DiffAlgebra[S, Alg, Out]
 with Relu.DiffAlgebra[S, Alg, Out]
 with WeightMat.DiffAlgebra[S, Alg, Out]
 with BiasMat.DiffAlgebra[S, Alg, Out]
+with Dense.DiffAlgebra[S, Alg, Out]

@@ -123,22 +123,22 @@ trait SndDiffCompiler extends Snd.DiffAlgebra[Double, ND4JAlgebra, ParametrisedF
 trait SplitDiffCompiler extends Split.DiffAlgebra[Double, ND4JAlgebra, ParametrisedFunction] {
   self : ND4JAlgebra[ParametrisedFunction] =>
 
-  def compile[A : Comonoid](
-    dag: Split[A, Double, ND4JAlgebra]
-  ) = new ParametrisedFunction[HNil, A, (A, A)] {
-    def apply(p: HNil, a: A): (A, A) = Comonoid[A].split(a)
+  def compile[A, B, C](
+    dag: Split[A, B, C, Double, ND4JAlgebra]
+  ) = new ParametrisedFunction[HNil, A, (B, C)] {
+    def apply(p: HNil, a: A): (B, C) = (dag.merger.left(a), dag.merger.right(a))
   }
 
-  def grada[A : AdditiveSemigroup](
-    g: Split.Diff[A, Double, ND4JAlgebra]
-  ) = new ParametrisedFunction[HNil, (A, (A, A)), A] {
-    def apply(p: HNil, a: (A, (A, A))): A = AdditiveSemigroup[A].plus(a._2._1, a._2._2)
+  def grada[A, B, C](
+    dag: Split.Diff[A, B, C, Double, ND4JAlgebra]
+  ) = new ParametrisedFunction[HNil, (A, (B, C)), A] {
+    def apply(p: HNil, a: (A, (B, C))): A = dag.merger(a._2._1, a._2._2)
   }
 
-  def gradp[A](
-    g: Split.Diff[A, Double, ND4JAlgebra]
-  ) = new ParametrisedFunction[HNil, (A, (A, A)), HNil] {
-    def apply(p: HNil, a: (A, (A, A))): HNil = HNil
+  def gradp[A, B, C](
+    dag: Split.Diff[A, B, C, Double, ND4JAlgebra]
+  ) = new ParametrisedFunction[HNil, (A, (B, C)), HNil] {
+    def apply(p: HNil, a: (A, (B, C))): HNil = HNil
   }
 }
 
@@ -165,6 +165,57 @@ trait JoinDiffCompiler extends Join.DiffAlgebra[Double, ND4JAlgebra, Parametrise
     def apply(p: HNil, a: ((A, B), C)): HNil = HNil
   }
 }
+
+//////////////////////////////////////////////////////////////////
+// SLIDEL
+trait SlideLDiffCompiler extends SlideL.DiffAlgebra[Double, ND4JAlgebra, ParametrisedFunction] {
+  self : ND4JAlgebra[ParametrisedFunction] =>
+
+  def compile[P, A, B](
+    dag: SlideL[P, A, B, Double, ND4JAlgebra]
+  ) = new ParametrisedFunction[P, A, B] {
+    def apply(p: P, a: A): B = dag.dag.compile(self)(HNil, (p, a))
+  }
+
+  def grada[P, A, B](
+    dag: SlideL.Diff[P, A, B, Double, ND4JAlgebra]
+  ) = new ParametrisedFunction[P, (A, B), A] {
+    def apply(p: P, a: (A, B)): A = dag.dag.gradA.compile(self)(HNil, ((p, a._1), a._2))._2
+  }
+
+  def gradp[P, A, B](
+    dag: SlideL.Diff[P, A, B, Double, ND4JAlgebra]
+  ) = new ParametrisedFunction[P, (A, B), P] {
+    def apply(p: P, a: (A, B)): P = dag.dag.gradA.compile(self)(HNil, ((p, a._1), a._2))._1
+  }
+
+}
+
+
+//////////////////////////////////////////////////////////////////
+// SLIDER
+trait SlideRDiffCompiler extends SlideR.DiffAlgebra[Double, ND4JAlgebra, ParametrisedFunction] {
+  self : ND4JAlgebra[ParametrisedFunction] =>
+
+  def compile[P, A, B](
+    dag: SlideR[P, A, B, Double, ND4JAlgebra]
+  ) = new ParametrisedFunction[HNil, (P, A), B] {
+    def apply(p: HNil, pa: (P, A)): B = dag.dag.compile(self)(pa._1, pa._2)
+  }
+
+  def grada[P, A, B](
+    dag: SlideR.Diff[P, A, B, Double, ND4JAlgebra]
+  ) = new ParametrisedFunction[HNil, ((P, A), B), (P, A)] {
+    def apply(p: HNil, pab: ((P, A), B)): (P, A) = (pab._1._1, dag.dag.gradA.compile(self)(pab._1._1, (pab._1._2, pab._2)))
+  }
+
+  def gradp[P, A, B](
+    dag: SlideR.Diff[P, A, B, Double, ND4JAlgebra]
+  ) = new ParametrisedFunction[HNil, ((P, A), B), HNil] {
+    def apply(p: HNil, a: ((P, A), B)): HNil = HNil
+  }
+}
+
 
 //////////////////////////////////////////////////////////////////
 // PROD
@@ -397,6 +448,58 @@ trait ND4JDiffCompiler extends nd4j.DiffAlgebra[Double, ND4JAlgebra, Parametrise
     }
   }
 
+
+//////////////////////////////////////////////////////////////////
+// Dense
+
+  def compile[InR <: XInt, OutR <: XInt, OutC <: XInt](
+    dag: Dense[Double, InR, OutR, OutC, ND4JAlgebra]
+  ): ParametrisedFunction[
+    Mat[Double, OutR x InR] :: HNil
+  , Mat[Double, InR x OutC]
+  , Mat[Double, OutR x OutC]
+  ] = new ParametrisedFunction[
+    Mat[Double, OutR x InR] :: HNil
+  , Mat[Double, InR x OutC]
+  , Mat[Double, OutR x OutC]
+  ] {
+    def apply(p: Mat[Double, OutR x InR] :: HNil, a: Mat[Double, InR x OutC]): Mat[Double, OutR x OutC] = {
+      new Mat[Double, OutR x OutC](p.head.value.mmul(a.value))
+    }
+  }
+
+  def grada[InR <: XInt, OutR <: XInt, OutC <: XInt](
+    dag: Dense.Diff[Double, InR, OutR, OutC, ND4JAlgebra]
+  ) = new ParametrisedFunction[
+    Mat[Double, OutR x InR] :: HNil
+  , (Mat[Double, InR x OutC], Mat[Double, OutR x OutC])
+  , Mat[Double, InR x OutC]
+  ] {
+    def apply(
+      p: Mat[Double, OutR x InR] :: HNil
+    , a: (Mat[Double, InR x OutC], Mat[Double, OutR x OutC])
+    ): Mat[Double, InR x OutC] = {
+      new Mat[Double, InR x OutC](p.head.value.transpose().mmul(a._2.value))
+    }
+  }
+
+  def gradp[InR <: XInt, OutR <: XInt, OutC <: XInt](
+    dag: Dense.Diff[Double, InR, OutR, OutC, ND4JAlgebra]
+  ) = new ParametrisedFunction[
+    Mat[Double, OutR x InR] :: HNil
+  , (Mat[Double, InR x OutC], Mat[Double, OutR x OutC])
+  , Mat[Double, OutR x InR] :: HNil
+  ] {
+    def apply(
+      p: Mat[Double, OutR x InR] :: HNil
+    , a: (Mat[Double, InR x OutC], Mat[Double, OutR x OutC])
+    ): Mat[Double, OutR x InR] :: HNil = {
+      val v = new Mat[Double, OutR x InR](a._2.value.mmul(a._1.value.transpose()))
+      v :: HNil
+    }
+  }
+
+
 //////////////////////////////////////////////////////////////////
 // Relu
   def compile[R <: XInt, C <: XInt](
@@ -423,7 +526,7 @@ trait ND4JDiffCompiler extends nd4j.DiffAlgebra[Double, ND4JAlgebra, Parametrise
     ): HNil = HNil
   }
 
-  def grada[R <: XInt, C <: XInt](
+  def grada[R <: XInt : SafeInt, C <: XInt : SafeInt](
     dag: Relu.Diff[Double, R, C, ND4JAlgebra]
   ) = new ParametrisedFunction[HNil, (Mat[Double, R x C], Mat[Double, R x C]), Mat[Double, R x C]] {
     def apply(
@@ -432,7 +535,11 @@ trait ND4JDiffCompiler extends nd4j.DiffAlgebra[Double, ND4JAlgebra, Parametrise
     ): Mat[Double, R x C] = {
 
       // in 0, relu is not differentiable => choosing a default value 1.0 (could be 0 or even 0.5)
-      a._2 // 1 * a._2
+      // 1 * a._2
+      val zero = Nd4j.zeros(implicitly[SafeInt[R]], implicitly[SafeInt[C]])
+      if(a._2.value.lt(0) == zero) a._2
+      else new Mat[Double, R x C](zero)
+
     }
   }
 
@@ -472,6 +579,7 @@ trait ND4JDiffCompiler extends nd4j.DiffAlgebra[Double, ND4JAlgebra, Parametrise
     }
   }
 
+  val fm = new org.nd4j.linalg.string.NDArrayStrings(8)
 
 //////////////////////////////////////////////////////////////////
 // L2
@@ -481,7 +589,8 @@ trait ND4JDiffCompiler extends nd4j.DiffAlgebra[Double, ND4JAlgebra, Parametrise
       def apply(p: HNil, m: (Mat[Double, D], Mat[Double, D])): Mat[Double, D] = {
         val (x, y) = m
         val scoreArr = x.value.rsub(y.value)
-        new Mat[Double, D](scoreArr.muli(scoreArr).muli(0.5))
+        val r = scoreArr.muli(scoreArr).muli(0.5)
+        new Mat[Double, D](r)
       }
     }
 
@@ -489,7 +598,13 @@ trait ND4JDiffCompiler extends nd4j.DiffAlgebra[Double, ND4JAlgebra, Parametrise
     new ParametrisedFunction[HNil, (Mat[Double, D], Mat[Double, D]), Mat[Double, D]] {
       def apply(p: HNil, m: (Mat[Double, D], Mat[Double, D])): Mat[Double, D] = {
         val (x, y) = m
-        new Mat(x.value.sub(y.value))
+        val r = x.value.sub(y.value)
+        println(s"""l2diff
+x:${fm.format(x.value)}
+y:${fm.format(y.value)}
+r:${fm.format(r)}
+        """)
+        new Mat(r)
       }
     }
 
@@ -497,25 +612,60 @@ trait ND4JDiffCompiler extends nd4j.DiffAlgebra[Double, ND4JAlgebra, Parametrise
     new ParametrisedFunction[HNil, (Mat[Double, D], Mat[Double, D]), Mat[Double, D]] {
       def apply(p: HNil, m: (Mat[Double, D], Mat[Double, D])): Mat[Double, D] = {
         val (x, y) = m
-        new Mat(x.value.sub(y.value))
+        val r = x.value.sub(y.value)
+        println(s"""l2diffinv
+x:${fm.format(x.value)}
+y:${fm.format(y.value)}
+r:${fm.format(r)}
+        """)
+        new Mat(r)
       }
     }
 
+
+//////////////////////////////////////////////////////////////////
+// OPS
 
   def compile[D <: Dim](dag: ScalarTimes[Double, D, ND4JAlgebra]) = 
     new ParametrisedFunction[HNil, (Double, Mat[Double, D]), Mat[Double, D]] {
       def apply(p: HNil, m: (Double, Mat[Double, D])): Mat[Double, D] = {
         val (x, y) = m
-        new Mat(y.value.muli(x))
+        val r = y.value.mul(x)
+
+        println(s"""scalartimes
+x:${x}
+y:${fm.format(y.value)}
+r:${fm.format(r)}
+        """)
+        new Mat(r)
       }
     }
 
+  def compile[D <: Dim](dag: Minus[D, Double, ND4JAlgebra]) = 
+    new ParametrisedFunction[HNil, (Mat[Double, D], Mat[Double, D]), Mat[Double, D]] {
+      def apply(p: HNil, m: (Mat[Double, D], Mat[Double, D])): Mat[Double, D] = {
+        val (x, y) = m
+        val r = x.value.rsub(y.value)
+        println(s"""minus
+x:${fm.format(x.value)}
+y:${fm.format(y.value)}
+r:${fm.format(r)}
+        """)
+        new Mat(r)
+      }
+    }
+
+  def compile[A, B](dag: Func[A, B, Double, ND4JAlgebra]) = 
+    new ParametrisedFunction[HNil, A, B] {
+      def apply(p: HNil, a: A): B = {
+        dag.f(a)
+      }
+    }
 }
 
 case class LearnCompiler(val learnRate: Double)
   extends ND4JAlgebra[Lambda[(p, a, b) => Dag[p, a, b, Double, ND4JAlgebra]]]
   with LearnCompiler0[Double, ND4JAlgebra] {
-
 
   val eps = learnRate
 
@@ -561,6 +711,34 @@ case class LearnCompiler(val learnRate: Double)
   , Double, ND4JAlgebra
   ] = grada0(dag)
 
+/////////////////////////////////////////////////////////////////////////////////////////////////////////
+// DENSE
+  def compile[InR <: XInt, OutR <: XInt, OutC <: XInt](
+    dag: Dense[Double, InR, OutR, OutC, ND4JAlgebra]
+  ): Dag[
+    Mat[Double, OutR x InR] :: HNil
+  , Mat[Double, InR x OutC]
+  , Mat[Double, OutR x OutC], Double, ND4JAlgebra
+  ] = compile0(dag)
+
+  def gradp[InR <: XInt, OutR <: XInt, OutC <: XInt](
+    dag: Dense.Diff[Double, InR, OutR, OutC, ND4JAlgebra]
+  ): Dag[
+    Mat[Double, OutR x InR] :: HNil
+  , (Mat[Double, InR x OutC], Mat[Double, OutR x OutC])
+  , Mat[Double, OutR x InR] :: HNil
+  , Double, ND4JAlgebra
+  ] = gradp0(dag)
+
+  def grada[InR <: XInt, OutR <: XInt, OutC <: XInt](
+    dag: Dense.Diff[Double, InR, OutR, OutC, ND4JAlgebra]
+  ): Dag[
+    Mat[Double, OutR x InR] :: HNil
+  , (Mat[Double, InR x OutC], Mat[Double, OutR x OutC])
+  , Mat[Double, InR x OutC]
+  , Double, ND4JAlgebra
+  ] = grada0(dag)
+
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////
 // RELU
@@ -572,7 +750,7 @@ case class LearnCompiler(val learnRate: Double)
     dag: Relu.Diff[Double, R, C, ND4JAlgebra]
   ): Dag[HNil, (Mat[Double, R x C], Mat[Double, R x C]), HNil, Double, ND4JAlgebra] = gradp0(dag)
 
-  def grada[R <: XInt, C <: XInt](
+  def grada[R <: XInt : SafeInt, C <: XInt : SafeInt](
     dag: Relu.Diff[Double, R, C, ND4JAlgebra]
   ): Dag[HNil, (Mat[Double, R x C], Mat[Double, R x C]), Mat[Double, R x C], Double, ND4JAlgebra] = grada0(dag)
 
@@ -609,6 +787,21 @@ case class LearnCompiler(val learnRate: Double)
   def compile[D <: neurocat.Dim](
     dag: ScalarTimes[Double, D, ND4JAlgebra]
   ): Dag[HNil,(Double,  Mat[Double, D]), Mat[Double, D], Double, ND4JAlgebra] = dag
+
+
+//////////////////////////////////////////////////////////////////
+// MINUS
+  def compile[D <: Dim](
+    dag: Minus[D, Double, ND4JAlgebra]
+  ): Dag[HNil, (Mat[Double, D], Mat[Double, D]), Mat[Double, D], Double, ND4JAlgebra] =
+    compile0(dag)
+
+//////////////////////////////////////////////////////////////////
+// FUNC
+  def compile[A, B](
+    dag: Func[A, B, Double, ND4JAlgebra]
+  ): Dag[HNil, A, B, Double, ND4JAlgebra] =
+    compile0(dag)
 }
 
 
@@ -624,4 +817,48 @@ with SplitDiffCompiler
 with JoinDiffCompiler
 with ND4JDiffCompiler
 with ApplyCompiler
+with SlideRDiffCompiler
+with SlideLDiffCompiler
 // with L2Compiler
+
+
+
+trait Trainer[
+  DataSet[row, nb]
+] {
+  def train[P, In, Out, NbSamples <: XInt : SafeInt](
+    learner: ParametrisedFunction[P, (In, Out), P]
+  )(
+    initParams: P
+  , trainingData: DataSet[(In, Out), NbSamples]
+  , beforeEach: (P, In, Out) => Unit = { (p:P, i:In, o:Out) => () }
+  , afterEach: (P, In, Out) => Unit = { (p:P, i:In, o:Out) => () }
+  ): P
+}
+
+object Trainer {
+  def naive[
+    DataSet[row, nb]
+  ](implicit rowTr: RowTraversable[DataSet]): Trainer[DataSet] =
+    new Trainer[DataSet] {      
+      def train[P, In, Out, NbSamples <: XInt : SafeInt](
+        learner: ParametrisedFunction[P, (In, Out), P]
+      )(
+        initParams: P
+      , trainingData: DataSet[(In, Out), NbSamples]
+      , beforeEach: (P, In, Out) => Unit = { (p:P, i:In, o:Out) => () }
+      , afterEach: (P, In, Out) => Unit = { (p:P, i:In, o:Out) => () }
+      ): P = {
+        var params = initParams
+
+        rowTr.foreachRow(trainingData) {
+          case (inRow, outRow) =>
+            beforeEach(params, inRow, outRow)
+            params = learner(params, (inRow, outRow))
+            afterEach(params, inRow, outRow)
+        }
+
+        params
+      }
+    }
+  }
