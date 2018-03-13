@@ -107,6 +107,25 @@ object WeightMat {
   trait DiffDsl[
     S, Alg[out[p, a, b]] <: nd4j.DiffAlgebra[S, Alg, out]
   ] {
+    trait WeightMatBuilder[Sym <: Singleton, InR <: XInt, OutC <: XInt, OutR <: XInt] {
+      def build(
+        implicit
+        costIn: CostDiffInvertBuilder[Mat[S, InR x OutC], S, Alg]
+      , costOut: CostDiffBuilder[Mat[S, OutR x OutC], S, Alg]
+      , scalarTimesOut: ScalarTimesBuilder[FieldType[Sym, Mat[S, OutR x InR]] :: HNil, S, Alg]
+      , minusA0: MinusBuilder[Mat[S, InR x OutC], S, Alg]
+      , minusP0: MinusPBuilder[FieldType[Sym, Mat[S, OutR x InR]] :: HNil, S, Alg]
+      ): DiffDag[
+          FieldType[Sym, Mat[S, OutR x InR]] :: HNil
+        , Mat[S, InR x OutC]
+        , Mat[S, OutR x OutC]
+        , S, Alg
+      ] = weightMat[Sym, InR, OutC, OutR](costIn, costOut, scalarTimesOut, minusA0, minusP0)
+    }
+
+    def weightMat[Sym <: Singleton, In <: Dim2[_, _], Out <: Dim2[_, _]](
+      implicit same: Dim2SameCol[In, Out]
+    ) = new WeightMatBuilder[Sym, same.In, same.OutC, same.OutR] {}
 
     def weightMat[Sym <: Singleton, InR <: XInt, OutC <: XInt, OutR <: XInt](
       implicit

@@ -599,11 +599,11 @@ trait ND4JDiffCompiler extends nd4j.DiffAlgebra[Double, ND4JAlgebra, Parametrise
       def apply(p: HNil, m: (Mat[Double, D], Mat[Double, D])): Mat[Double, D] = {
         val (x, y) = m
         val r = x.value.sub(y.value)
-        println(s"""l2diff
-x:${fm.format(x.value)}
-y:${fm.format(y.value)}
-r:${fm.format(r)}
-        """)
+//         println(s"""l2diff
+// x:${fm.format(x.value)}
+// y:${fm.format(y.value)}
+// r:${fm.format(r)}
+//         """)
         new Mat(r)
       }
     }
@@ -613,11 +613,11 @@ r:${fm.format(r)}
       def apply(p: HNil, m: (Mat[Double, D], Mat[Double, D])): Mat[Double, D] = {
         val (x, y) = m
         val r = x.value.sub(y.value)
-        println(s"""l2diffinv
-x:${fm.format(x.value)}
-y:${fm.format(y.value)}
-r:${fm.format(r)}
-        """)
+//         println(s"""l2diffinv
+// x:${fm.format(x.value)}
+// y:${fm.format(y.value)}
+// r:${fm.format(r)}
+//         """)
         new Mat(r)
       }
     }
@@ -632,11 +632,11 @@ r:${fm.format(r)}
         val (x, y) = m
         val r = y.value.mul(x)
 
-        println(s"""scalartimes
-x:${x}
-y:${fm.format(y.value)}
-r:${fm.format(r)}
-        """)
+//         println(s"""scalartimes
+// x:${x}
+// y:${fm.format(y.value)}
+// r:${fm.format(r)}
+//         """)
         new Mat(r)
       }
     }
@@ -646,11 +646,11 @@ r:${fm.format(r)}
       def apply(p: HNil, m: (Mat[Double, D], Mat[Double, D])): Mat[Double, D] = {
         val (x, y) = m
         val r = x.value.rsub(y.value)
-        println(s"""minus
-x:${fm.format(x.value)}
-y:${fm.format(y.value)}
-r:${fm.format(r)}
-        """)
+//         println(s"""minus
+// x:${fm.format(x.value)}
+// y:${fm.format(y.value)}
+// r:${fm.format(r)}
+//         """)
         new Mat(r)
       }
     }
@@ -831,6 +831,7 @@ trait Trainer[
   )(
     initParams: P
   , trainingData: DataSet[(In, Out), NbSamples]
+  , epoch: Int = 1
   , beforeEach: (P, In, Out) => Unit = { (p:P, i:In, o:Out) => () }
   , afterEach: (P, In, Out) => Unit = { (p:P, i:In, o:Out) => () }
   ): P
@@ -846,19 +847,64 @@ object Trainer {
       )(
         initParams: P
       , trainingData: DataSet[(In, Out), NbSamples]
+      , epoch: Int = 1
       , beforeEach: (P, In, Out) => Unit = { (p:P, i:In, o:Out) => () }
       , afterEach: (P, In, Out) => Unit = { (p:P, i:In, o:Out) => () }
       ): P = {
         var params = initParams
 
-        rowTr.foreachRow(trainingData) {
-          case (inRow, outRow) =>
-            beforeEach(params, inRow, outRow)
-            params = learner(params, (inRow, outRow))
-            afterEach(params, inRow, outRow)
+        (1 to epoch).foreach { i =>
+          rowTr.foreachRow(trainingData) {
+            case (inRow, outRow) =>
+              beforeEach(params, inRow, outRow)
+              params = learner(params, (inRow, outRow))
+              afterEach(params, inRow, outRow)
+          }
         }
 
         params
       }
     }
   }
+
+
+
+object LearnedIndex {
+
+  val size : 1000 = 1000
+  type size = 1000
+  val data = Nd4j.rand(size, 1)
+  val sortedData = Nd4j.sort(data.dup(), 0, true)
+
+  val index = data.dup()
+  val len = data.length
+
+  @annotation.tailrec
+  def searchFirstGT(lowerBound: Int, upperBound: Int, d: Double): Option[Int] = {
+    val min = lowerBound
+    val max = upperBound
+
+    val mid = (max + min) / 2
+    val dmid = sortedData.getDouble(mid)
+    if(dmid == d)
+      Some(mid)
+    else if(d < dmid) {
+      if(min == max) Some(mid)
+      else searchFirstGT(lowerBound, mid, d)
+    }
+    else {
+      if(min == max) None
+      else searchFirstGT(mid, upperBound, d)
+    }
+
+  }
+
+  (0 until len).foreach { i =>
+    val d = index.getDouble(i)
+
+    val Some(di) = searchFirstGT(0, len, d)
+    val r = di / len.toDouble
+    index.putScalar(i, r)
+  }
+
+}

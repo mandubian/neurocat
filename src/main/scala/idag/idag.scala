@@ -2,6 +2,7 @@ package neurocat
 package idag
 
 import shapeless.HNil
+import typeclasses._
 
 
 trait Dag[
@@ -21,6 +22,7 @@ trait DiffDag[
   P, A, B
 , S, Alg[out[p, a, b]] <: DiffDagAlgebra[S, Alg, out]
 ] extends Dag[P, A, B, S, Alg] {
+  self =>
 
   def costDiffInvert: CostDiffInvertBuilder[A, S, Alg]
   def costDiff: CostDiffBuilder[B, S, Alg]
@@ -31,4 +33,10 @@ trait DiffDag[
   def gradP: Dag[P, (A, B), P, S, Alg]
 
   def gradA: Dag[P, (A, B), A, S, Alg]
+
+  def >>:[Q, C, QGP, QGA](other: DiffDag[Q, C, A, S, Alg])(
+    implicit
+      merger: Merger[Q, P]
+  ): DiffDag[merger.Out, C, B, S, Alg] = Compose.compose(self, other)
+
 }

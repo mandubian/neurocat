@@ -33,3 +33,5 @@ addCompilerPlugin("org.spire-math" %% "kind-projector" % "0.9.4")
 testFrameworks += new TestFramework("minitest.runner.Framework")
 
 fork := true
+
+fork in Test := true

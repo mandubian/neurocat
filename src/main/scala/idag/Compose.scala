@@ -113,13 +113,13 @@ object Compose {
     ](g: DiffDag[Q, B, C, S, Alg], f: DiffDag[P, A, B, S, Alg])(
       implicit
         merger0: Merger[P, Q]
-      , costDiffInvertA: CostDiffInvertBuilder[A, S, Alg]
-      , costDiffC: CostDiffBuilder[C, S, Alg]
-      , minusA0: MinusBuilder[A, S, Alg]
-      , scalarTimesP0: ScalarTimesBuilder[P, S, Alg]
-      , scalarTimesQ0: ScalarTimesBuilder[Q, S, Alg]
-      , minusP0: MinusPBuilder[P, S, Alg]
-      , minusQ0: MinusPBuilder[Q, S, Alg]
+      // , costDiffInvertA: CostDiffInvertBuilder[A, S, Alg]
+      // , costDiffC: CostDiffBuilder[C, S, Alg]
+      // , minusA0: MinusBuilder[A, S, Alg]
+      // , scalarTimesP0: ScalarTimesBuilder[P, S, Alg]
+      // , scalarTimesQ0: ScalarTimesBuilder[Q, S, Alg]
+      // , minusP0: MinusPBuilder[P, S, Alg]
+      // , minusQ0: MinusPBuilder[Q, S, Alg]
     ): DiffDag[merger0.Out, A, C, S, Alg]
     = new Compose.Diff[
         P, A, B, Q, C
@@ -127,11 +127,49 @@ object Compose {
       , S, Alg
       ](g, f) {
         val merger = merger0
-        val costDiffInvert = costDiffInvertA
-        val costDiff = costDiffC
-        val scalarTimes = implicitly[ScalarTimesBuilder[merger0.Out, S, Alg]] //scalarTimesPQ
-        val minusA = minusA0
-        val minusP = implicitly[MinusPBuilder[merger0.Out, S, Alg]] //minusPQ
+        val costDiffInvert = f.costDiffInvert
+        val costDiff = g.costDiff
+        val scalarTimes = {
+          implicit val sp = f.scalarTimes
+          implicit val sq = g.scalarTimes
+          implicitly[ScalarTimesBuilder[merger0.Out, S, Alg]]
+        }
+        val minusA = f.minusA
+        val minusP = {
+          implicit val mp = f.minusP
+          implicit val mq = g.minusP
+          implicitly[MinusPBuilder[merger0.Out, S, Alg]]
+        }
       }
-  }  
+  }
+
+
+    def compose[
+      P, A, B, PGP, PGA
+    , Q, C, QGP, QGA
+    , S, Alg[out[p, a, b]] <: DiffDagAlgebra[S, Alg, out]
+    ](g: DiffDag[Q, B, C, S, Alg], f: DiffDag[P, A, B, S, Alg])(
+      implicit
+        merger0: Merger[P, Q]
+    ): DiffDag[merger0.Out, A, C, S, Alg]
+    = new Compose.Diff[
+        P, A, B, Q, C
+      , merger0.Out
+      , S, Alg
+      ](g, f) {
+        val merger = merger0
+        val costDiffInvert = f.costDiffInvert
+        val costDiff = g.costDiff
+        val scalarTimes = {
+          implicit val sp = f.scalarTimes
+          implicit val sq = g.scalarTimes
+          implicitly[ScalarTimesBuilder[merger0.Out, S, Alg]]
+        }
+        val minusA = f.minusA
+        val minusP = {
+          implicit val mp = f.minusP
+          implicit val mq = g.minusP
+          implicitly[MinusPBuilder[merger0.Out, S, Alg]]
+        }
+      }  
 }
